@@ -32,6 +32,15 @@ const envSchema = z.object({
    */
   MENU_URL_MODE: z.enum(['path', 'subdomain']).default('path'),
 
+  /**
+   * Limitation de débit. Active partout par défaut ; les suites de tests l'éteignent pour
+   * ne pas se limiter elles-mêmes — un test dédié la rallume et vérifie qu'elle mord.
+   */
+  RATE_LIMIT_ENABLED: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((v) => v === 'true'),
+
   STORAGE_DRIVER: z.enum(['local']).default('local'),
   STORAGE_LOCAL_PATH: z.string().default('./storage'),
   STORAGE_PUBLIC_PREFIX: z.string().default('/media'),

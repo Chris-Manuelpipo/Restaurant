@@ -54,25 +54,29 @@ const menuItemBase = z.object({
  * dans les tests. Un plat a **soit** un prix de base, **soit** au moins une variante.
  * Les deux à la fois rendrait l'affichage ambigu ; aucun des deux rendrait le plat incommandable.
  */
-const priceRule = <T extends { basePrice?: number | null; variants?: unknown[] }>(value: T) => {
+function priceRule(value: { basePrice?: number | null; variants?: unknown[] }): boolean {
   const hasBase = value.basePrice != null;
   const hasVariants = Array.isArray(value.variants) && value.variants.length > 0;
   return hasBase !== hasVariants;
-};
+}
 
-const priceRuleMessage = {
-  message:
-    'Indiquez un prix unique, ou bien au moins une variante (petit, moyen, grand) — mais pas les deux.',
-  path: ['basePrice'] as const,
-};
+const PRICE_RULE_MESSAGE =
+  'Indiquez un prix unique, ou bien au moins une variante (petit, moyen, grand) — mais pas les deux.';
 
-export const createMenuItemSchema = menuItemBase.refine(priceRule, priceRuleMessage);
+export const createMenuItemSchema = menuItemBase.refine(priceRule, {
+  message: PRICE_RULE_MESSAGE,
+  path: ['basePrice'],
+});
 
-export const updateMenuItemSchema = menuItemBase
-  .partial()
-  .refine((value) => value.basePrice === undefined && value.variants === undefined ? true : priceRule(value), {
-    ...priceRuleMessage,
-  });
+/**
+ * En modification partielle, la règle ne s'applique que si l'un des deux champs est touché :
+ * changer un simple libellé ne doit pas exiger de renvoyer toute la grille tarifaire.
+ */
+export const updateMenuItemSchema = menuItemBase.partial().refine(
+  (value) =>
+    value.basePrice === undefined && value.variants === undefined ? true : priceRule(value),
+  { message: PRICE_RULE_MESSAGE, path: ['basePrice'] },
+);
 
 export const updateItemStatusSchema = z.object({
   status: z.enum(ITEM_STATUSES),
