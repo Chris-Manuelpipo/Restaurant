@@ -1,0 +1,345 @@
+// ═══════════════════════════════════════════════════════════════════════════
+//  Evolyx Restaurant — schéma du lot 1 (socle + Menu QR)
+//
+//  Trois règles tenues partout :
+//   1. toute entité métier porte `restaurantId` — l'isolation est structurelle ;
+//   2. rien ne se supprime : `archivedAt` remplace le DELETE, l'historique des
+//      commandes à venir dépendra de ces lignes ;
+//   3. les montants sont des entiers de francs, les instants sont en UTC et le
+//      fuseau du restaurant est stocké à part.
+// ═══════════════════════════════════════════════════════════════════════════
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RestaurantStatus {
+  ACTIVE
+  SUSPENDED
+  TRIAL
+}
+
+enum Role {
+  PLATFORM_ADMIN
+  ADMIN
+  MANAGER
+  STAFF
+}
+
+enum ItemStatus {
+  AVAILABLE
+  SOLD_OUT
+  DISABLED
+}
+
+enum RuleTargetType {
+  CATEGORY
+  ITEM
+}
+
+enum RuleKind {
+  VISIBILITY
+  PROMO
+}
+
+enum AccessPointKind {
+  TABLE
+  COUNTER
+  WINDOW
+  POSTER
+  OTHER
+}
+
+model Restaurant {
+  id       String           @id @default(cuid(2))
+  slug     String           @unique
+  name     String
+  tagline  String?
+  status   RestaurantStatus @default(TRIAL)
+
+  logoUrl     String?
+  coverUrl    String?
+  coverPreset String?
+
+  /// { primary, background, fontDisplay, cornerRadius } — voir deriveTheme()
+  theme Json
+
+  timezone       String   @default("Africa/Douala")
+  currency       String   @default("XAF")
+  defaultLocale  String   @default("fr")
+  enabledLocales String[] @default(["fr"])
+
+  address  String?
+  phone    String?
+  whatsapp String?
+  /// { facebook?, instagram?, tiktok?, website? }
+  socials  Json    @default("{}")
+
+  /// Modularité par activation : la navigation, les permissions et les endpoints
+  /// disponibles se déduisent de cette liste. Jamais de fork par client.
+  enabledModules String[] @default(["core", "menu_qr"])
+
+  /// Progression de la mise en service, 0 à 5. `onboardingCompletedAt` fait foi.
+  onboardingStep        Int       @default(0)
+  onboardingCompletedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users             User[]
+  openingHours      OpeningHours[]
+  categories        Category[]
+  menuItems         MenuItem[]
+  availabilityRules AvailabilityRule[]
+  accessPoints      AccessPoint[]
+  auditLogs         AuditLog[]
+  invitations       Invitation[]
+
+  @@index([status])
+}
+
+model OpeningHours {
+  id           String     @id @default(cuid(2))
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  /// 0 = dimanche … 6 = samedi
+  dayOfWeek Int
+  isOpen    Boolean @default(true)
+  /// "HH:MM" dans le fuseau du restaurant. `closeTime` < `openTime` = service qui passe minuit.
+  openTime  String  @default("11:00")
+  closeTime String  @default("22:00")
+
+  @@unique([restaurantId, dayOfWeek])
+  @@index([restaurantId])
+}
+
+model User {
+  id String @id @default(cuid(2))
+
+  /// null pour un PLATFORM_ADMIN : il n'appartient à aucun restaurant.
+  restaurantId String?
+  restaurant   Restaurant? @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  email        String @unique
+  passwordHash String
+  fullName     String
+  role         Role   @default(STAFF)
+
+  isActive    Boolean   @default(true)
+  lastLoginAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  refreshTokens RefreshToken[]
+  auditLogs     AuditLog[]
+
+  @@index([restaurantId])
+  @@index([role])
+}
+
+/// Jetons de rafraîchissement : stockés hachés, révocables un par un.
+model RefreshToken {
+  id        String    @id @default(cuid(2))
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+/// Invitation d'un administrateur à prendre possession de son restaurant.
+model Invitation {
+  id           String     @id @default(cuid(2))
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  email      String
+  fullName   String
+  role       Role      @default(ADMIN)
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  acceptedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([restaurantId])
+  @@index([email])
+}
+
+model Category {
+  id           String     @id @default(cuid(2))
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  /// { fr, en? }
+  name     Json
+  icon     String?
+  color    String?
+  position Int     @default(0)
+
+  isVisible  Boolean   @default(true)
+  archivedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  menuItems MenuItem[]
+
+  @@index([restaurantId, position])
+  @@index([restaurantId, archivedAt])
+}
+
+model MenuItem {
+  id           String     @id @default(cuid(2))
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  /// { fr, en? }
+  name        Json
+  /// { fr?, en? }
+  description Json?
+
+  /// Exclusif avec `variants` : contrainte CHECK posée par migration.
+  basePrice   Int?
+  prepMinutes Int?
+  allergens   String[] @default([])
+  isPerPerson Boolean  @default(false)
+  /// Pastille libre affichée sur la carte : { fr, en? }
+  badge       Json?
+
+  status     ItemStatus @default(AVAILABLE)
+  archivedAt DateTime?
+  position   Int        @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  variants    MenuItemVariant[]
+  supplements MenuItemSupplement[]
+  images      MenuItemImage[]
+
+  @@index([restaurantId, position])
+  @@index([restaurantId, categoryId])
+  @@index([restaurantId, status])
+  @@index([categoryId])
+}
+
+model MenuItemVariant {
+  id         String   @id @default(cuid(2))
+  menuItemId String
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+
+  name     Json
+  price    Int
+  position Int  @default(0)
+
+  @@index([menuItemId, position])
+}
+
+model MenuItemSupplement {
+  id         String   @id @default(cuid(2))
+  menuItemId String
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+
+  name     Json
+  price    Int
+  position Int  @default(0)
+
+  @@index([menuItemId, position])
+}
+
+model MenuItemImage {
+  id         String   @id @default(cuid(2))
+  menuItemId String
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+
+  /// Clé opaque chez le StorageAdapter — jamais une URL en dur.
+  storageKey String
+  position   Int    @default(0)
+  /// { thumb, medium, large, fallback, width, height }
+  variants   Json
+
+  createdAt DateTime @default(now())
+
+  @@index([menuItemId, position])
+}
+
+model AvailabilityRule {
+  id           String     @id @default(cuid(2))
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  targetType RuleTargetType
+  targetId   String
+  kind       RuleKind
+
+  daysOfWeek Int[]
+  /// "HH:MM" ; `endTime` < `startTime` = créneau qui passe minuit.
+  startTime  String
+  endTime    String
+
+  /// Affiché aux clients pour les promotions : { fr, en? }
+  label           Json?
+  /// Informatif au lot 1 ; le module Caisse l'appliquera au calcul.
+  discountPercent Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([restaurantId, targetType, targetId])
+  @@index([restaurantId, kind])
+}
+
+model AccessPoint {
+  id           String     @id @default(cuid(2))
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  /// Six caractères, alphabet sans ambiguïté, unique sur toute la plateforme.
+  /// Une fois imprimé, ce code ne change JAMAIS.
+  code  String          @unique
+  kind  AccessPointKind @default(TABLE)
+  label String
+
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  revokedAt DateTime?
+
+  @@index([restaurantId, isActive])
+  @@index([restaurantId, kind])
+}
+
+model AuditLog {
+  id String @id @default(cuid(2))
+
+  restaurantId String?
+  restaurant   Restaurant? @relation(fields: [restaurantId], references: [id], onDelete: SetNull)
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  /// Verbe métier : "price.changed", "item.status_changed", "theme.updated"…
+  action     String
+  entityType String
+  entityId   String
+  /// { before, after } réduit aux champs qui ont bougé.
+  diff       Json
+
+  createdAt DateTime @default(now())
+
+  @@index([restaurantId, createdAt])
+  @@index([entityType, entityId])
+}
