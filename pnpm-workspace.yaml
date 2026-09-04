@@ -1,0 +1,14 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+  - "e2e"
+
+# pnpm 11 exige un accord explicite pour les scripts de post-installation.
+allowBuilds:
+  esbuild: true
+  prisma: true
+  "@prisma/client": true
+  "@prisma/engines": true
+  sharp: true
+  argon2: true
+  "@parcel/watcher": true
