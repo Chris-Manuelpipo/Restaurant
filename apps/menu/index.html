@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#17130F" />
+    <meta name="description" content="Le menu du restaurant, à jour et consultable hors ligne." />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Menu</title>
+    <!--
+      Le fond est peint avant même que React ne démarre : sur un Android modeste et une
+      connexion lente, un écran blanc d'une seconde est ce que le client remarque en premier.
+    -->
+    <style>
+      :root { color-scheme: dark; }
+      html, body { margin: 0; background: #17130F; }
+      #root { min-height: 100dvh; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
