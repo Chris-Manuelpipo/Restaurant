@@ -7,7 +7,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "pnpm --parallel --filter \"./apps/*\" dev",
+    "dev": "pnpm --parallel --filter @evolyx/shared --filter \"./apps/*\" dev",
     "build": "pnpm -r build",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "pnpm -r typecheck",
@@ -17,7 +17,8 @@
     "db:migrate": "pnpm --filter @evolyx/api db:migrate",
     "db:reset": "pnpm --filter @evolyx/api db:reset",
     "e2e": "pnpm --filter @evolyx/e2e test",
-    "format": "prettier --write \"**/*.{ts,tsx,json,md,css}\""
+    "format": "prettier --write \"**/*.{ts,tsx,json,md,css}\"",
+    "predev": "pnpm --filter @evolyx/shared build"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

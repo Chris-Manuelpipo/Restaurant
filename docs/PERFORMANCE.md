@@ -43,7 +43,7 @@ latence), processeur ralenti ×4, cache vide, médiane de trois passes, sur *Le 
 
 | Mesure | Valeur | Budget | |
 |---|---:|---:|:--|
-| Premier rendu (FCP) | **1,41 s** | — | |
+| Premier rendu (FCP) | **1,39 s** | — | |
 | Plus grand contenu (LCP) | **2,79 s** | 2,50 s | **✗ +0,29 s** |
 | Décalage cumulé (CLS) | **0,015** | 0,10 | ✓ |
 | Transféré, images comprises | **178 Ko** | 300 Ko | ✓ |
@@ -136,9 +136,14 @@ discret indique la date d'enregistrement — non pas d'après `navigator.onLine`
 « une interface réseau est active » (le Wi-Fi d'un restaurant sans lien Internet y répond « oui »),
 mais d'après l'âge réel de la réponse affichée.
 
-**Accessibilité.** Cibles tactiles à 44 px minimum, focus visible au clavier,
-`prefers-reduced-motion` respecté, contraste vérifié et affiché dans le sélecteur de charte, un
-seul `h1` par page, feuille de détail en `role="dialog"` fermable au clavier.
+**Accessibilité.** Vérifiée par `e2e/tests/accessibilite.spec.ts`, sur la page réelle et sur les
+deux chartes : navigation clavier atteignant les plats avec un focus visible, ouverture par Entrée
+et fermeture par Échap, cibles tactiles d'au moins 44 px, `prefers-reduced-motion` respecté,
+contraste du texte au-dessus de 4,5:1, un seul `h1`, langue déclarée.
+
+Cette suite a d'ailleurs trouvé un vrai défaut : le fond de secours codé dans le `<head>` — celui
+qui évite l'écran blanc — l'emportait sur la charte, et une charte claire se retrouvait sur un
+fond sombre partout où le menu ne couvrait pas l'écran.
 
 ---
 

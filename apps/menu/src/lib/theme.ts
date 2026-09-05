@@ -18,6 +18,17 @@ export function applyTheme(theme: Partial<ThemeInput>): void {
   document.body.dataset.light = String(!derived.isDark);
   root.style.colorScheme = derived.isDark ? 'dark' : 'light';
 
+  /**
+   * Le fond est posé en style **en ligne**, et pas seulement par la feuille de styles : le
+   * `<head>` porte un fond de secours codé en dur, qui peint la page avant que le moindre
+   * script ne tourne. Hors de toute couche de cascade, ce fond de secours l'emporterait
+   * sinon sur la charte — et une charte claire se retrouverait sur un fond sombre partout
+   * où le menu ne couvre pas l'écran.
+   */
+  root.style.background = derived.vars['--bg'];
+  document.body.style.background = derived.vars['--bg'];
+  document.body.style.color = derived.vars['--text'];
+
   // La barre du navigateur prend la couleur du menu : le passage à la page est sans couture.
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', derived.vars['--bg']);
