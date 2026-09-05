@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url';
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
@@ -10,12 +10,26 @@ import { VitePWA } from 'vite-plugin-pwa';
  * Son poids conditionne l'expérience du client final : elle n'embarque jamais une ligne de
  * l'admin. Budget tenu : moins de 300 Ko transférés au premier chargement, polices comprises.
  */
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [
+    {
+      // Le script de préchargement du HTML a besoin de l'adresse de l'API : elle n'est
+      // connue qu'à la construction, on la substitue ici.
+      name: 'evolyx-api-url',
+      transformIndexHtml(html: string) {
+        const api =
+          loadEnv(mode, fileURLToPath(new URL('../..', import.meta.url)), '').VITE_API_URL ??
+          'http://localhost:3010';
+        return html.replaceAll('__API_URL__', api);
+      },
+    },
     react(),
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
+      // Le service worker s'installe **après** le chargement : au premier scan, il entrerait
+      // sinon en concurrence avec la carte elle-même pour une bande passante déjà rare.
+      injectRegister: null,
       includeAssets: ['favicon.svg'],
       manifest: {
         name: 'Menu',
@@ -95,7 +109,6 @@ export default defineConfig({
         manualChunks: (id) => {
           if (id.includes('node_modules')) {
             if (id.includes('react') || id.includes('scheduler')) return 'react';
-            if (id.includes('@tanstack')) return 'tanstack';
             return 'vendor';
           }
           return undefined;
@@ -104,4 +117,4 @@ export default defineConfig({
     },
   },
   server: { port: 5181, strictPort: true },
-});
+}));

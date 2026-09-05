@@ -1,0 +1,91 @@
+# ═══════════════════════════════════════════════════════════════════════════
+#  Evolyx Restaurant — pile complète
+#
+#  `docker compose up` démarre PostgreSQL, l'API, le back-office et le menu
+#  client. `docker compose run --rm api pnpm seed` remplit la base.
+#
+#  Les trois images partagent un seul Dockerfile multi-cibles : le monorepo est
+#  installé une fois, chaque cible ne garde que ce qui la concerne.
+# ═══════════════════════════════════════════════════════════════════════════
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-evolyx_restaurant}
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      # L'API attend une base réellement prête, pas un conteneur simplement démarré.
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-postgres}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-evolyx_restaurant}?schema=public
+      API_PORT: 3000
+      API_HOST: 0.0.0.0
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?définissez JWT_ACCESS_SECRET dans .env}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?définissez JWT_REFRESH_SECRET dans .env}
+      PUBLIC_MENU_URL: ${PUBLIC_MENU_URL:-http://localhost:5181}
+      ADMIN_URL: ${ADMIN_URL:-http://localhost:5180}
+      API_PUBLIC_URL: ${API_PUBLIC_URL:-http://localhost:3010}
+      MENU_URL_MODE: ${MENU_URL_MODE:-path}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - '${API_PORT:-3010}:3000'
+    volumes:
+      # Les images envoyées survivent aux redéploiements.
+      - api-storage:/app/apps/api/storage
+    command: sh -c "pnpm --filter @evolyx/api db:migrate && node apps/api/dist/server.js"
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  admin:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: admin
+      args:
+        VITE_API_URL: ${API_PUBLIC_URL:-http://localhost:3010}
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - '${ADMIN_PORT:-5180}:80'
+
+  menu:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: menu
+      args:
+        VITE_API_URL: ${API_PUBLIC_URL:-http://localhost:3010}
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - '${MENU_PORT:-5181}:80'
+
+volumes:
+  postgres-data:
+  api-storage:

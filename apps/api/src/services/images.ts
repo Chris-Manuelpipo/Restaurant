@@ -122,10 +122,12 @@ export async function processCover(
   const storage = getStorage();
   const hash = hashContent(buffer);
 
+  // 960 px de large suffisent : la couverture s'affiche sur 520 px au maximum, et c'est
+  // elle qui arrive en dernier sur un réseau lent. Chaque kilo-octet s'y voit.
   const webp = await sharp(buffer)
     .rotate()
-    .resize({ width: 1280, height: 640, fit: 'cover', position: 'attention' })
-    .webp({ quality: 72, effort: 4 })
+    .resize({ width: 960, height: 480, fit: 'cover', position: 'attention' })
+    .webp({ quality: 68, effort: 5 })
     .toBuffer();
 
   const key = brandKey(restaurantId, 'cover', hash, 'webp');

@@ -23,7 +23,13 @@ export function applyTheme(theme: Partial<ThemeInput>): void {
   if (meta) meta.setAttribute('content', derived.vars['--bg']);
 }
 
-/** Couverture : la photo du restaurant si elle existe, sinon le dégradé dérivé de la charte. */
-export function coverStyle(coverUrl: string | null): React.CSSProperties | undefined {
-  return coverUrl ? { backgroundImage: `url(${coverUrl})` } : undefined;
-}
+/**
+ * La couverture reste le dégradé dérivé de la charte, peint sans aucune requête. La photo,
+ * quand il y en a une, se pose **par-dessus**, en fondu.
+ *
+ * Ce n'est pas un détail de style : en fond CSS, la photo devenait l'élément le plus grand de
+ * la page, et le navigateur ne considérait la page « peinte » qu'une fois cette image arrivée
+ * — soit trois secondes de plus sur un réseau lent, pour une image purement décorative. Le
+ * texte, lui, est l'information : c'est lui qui doit arriver en premier.
+ */
+export const COVER_FADE_MS = 400;

@@ -54,9 +54,28 @@ const BODY_FONT: FontSpec = DISPLAY_FONTS.inter;
 
 const loaded = new Set<string>();
 
+/**
+ * Attend que le navigateur n'ait plus rien d'urgent à faire.
+ *
+ * Sur une 4G lente, la bande passante est la ressource rare : quatre-vingts kilo-octets de
+ * police téléchargés pendant que la photo du restaurant attend son tour, c'est une seconde
+ * de plus avant que la page ne paraisse chargée. Avec `font-display: swap`, le texte est
+ * lisible dès la première seconde dans la police de repli — la vraie police peut attendre.
+ */
+function whenIdle(): Promise<void> {
+  return new Promise((resolve) => {
+    const idle = (globalThis as { requestIdleCallback?: (cb: () => void, options?: { timeout: number }) => number })
+      .requestIdleCallback;
+    if (idle) idle(() => resolve(), { timeout: 4000 });
+    else setTimeout(resolve, 1200);
+  });
+}
+
 async function register(spec: FontSpec): Promise<void> {
   if (loaded.has(spec.family)) return;
   loaded.add(spec.family);
+
+  await whenIdle();
 
   try {
     const { default: url } = await spec.url();

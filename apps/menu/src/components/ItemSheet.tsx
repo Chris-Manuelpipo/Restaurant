@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { JSX } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '../lib/i18n';
 import { formatMoney, type PublicMenuItem } from '@evolyx/shared';
 
 /**
@@ -81,7 +81,11 @@ export function ItemSheet({
         >
           {image ? (
             <picture>
-              <source srcSet={`${image.medium} 480w, ${image.large} 960w`} type="image/webp" />
+              <source
+                srcSet={`${image.medium} 480w, ${image.large} 960w`}
+                sizes="(max-width: 520px) 100vw, 492px"
+                type="image/webp"
+              />
               <img
                 src={image.fallback}
                 alt=""

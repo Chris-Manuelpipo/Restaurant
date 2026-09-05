@@ -134,6 +134,18 @@ a[role='button'] {
       var(--bg) 100%
     );
   }
+  /* La photo se superpose au dégradé, une fois chargée : jamais de zone vide en attendant. */
+  .cover-photo {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0;
+    transition: opacity 0.4s var(--ease);
+  }
+  .cover-photo.is-loaded { opacity: 1; }
+
   .cover-grid {
     position: absolute;
     inset: 0;

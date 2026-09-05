@@ -1,6 +1,9 @@
 {
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
+    // Les blocs `page.evaluate()` s'exécutent dans le navigateur : leur code a besoin
+    // des types du DOM, même si les tests eux-mêmes tournent sous Node.
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "types": ["node"],
     "noEmit": true,
     "noUncheckedIndexedAccess": false

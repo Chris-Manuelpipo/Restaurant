@@ -13,12 +13,8 @@
   },
   "dependencies": {
     "@evolyx/shared": "workspace:*",
-    "@tanstack/react-query": "^5.62.11",
-    "@tanstack/react-router": "^1.95.1",
-    "i18next": "^24.2.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "react-i18next": "^15.4.0"
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@fontsource-variable/bricolage-grotesque": "^5.1.1",

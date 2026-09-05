@@ -1,4 +1,4 @@
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '../lib/i18n';
 import type { PublicOpening } from '@evolyx/shared';
 import type { JSX } from 'react';
 

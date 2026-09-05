@@ -12,11 +12,31 @@ const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://
 export class MenuNotFound extends Error {}
 export class MenuUnavailable extends Error {}
 
+declare global {
+  interface Window {
+    __evolyxMenu?: { slug: string; locale: string | null; promise: Promise<Response> };
+  }
+}
+
+/** Récupère la réponse lancée par le HTML, si elle correspond exactement à ce qu'on demande. */
+function takePreloaded(slug: string, locale?: string): Promise<Response> | null {
+  const preloaded = window.__evolyxMenu;
+  if (!preloaded) return null;
+  if (preloaded.slug !== slug) return null;
+  if ((preloaded.locale ?? undefined) !== locale) return null;
+
+  // Une seule fois : un rechargement doit repasser par le réseau.
+  delete window.__evolyxMenu;
+  return preloaded.promise;
+}
+
 export async function fetchMenu(slug: string, locale?: string): Promise<PublicMenuResponse> {
   const url = new URL(`/api/v1/public/r/${encodeURIComponent(slug)}/menu`, API_URL);
   if (locale) url.searchParams.set('locale', locale);
 
-  const response = await fetch(url, { headers: { accept: 'application/json' } });
+  const response =
+    (await takePreloaded(slug, locale)) ??
+    (await fetch(url, { headers: { accept: 'application/json' } }));
 
   if (response.status === 404) throw new MenuNotFound('Ce restaurant est introuvable.');
   if (response.status === 410) {

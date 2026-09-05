@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { useParams, useSearch } from '@tanstack/react-router';
-import { useTranslation } from 'react-i18next';
+import { LocaleProvider, useTranslation } from '../lib/i18n';
 import type { PublicMenuItem, PublicMenuResponse } from '@evolyx/shared';
 
-import { MenuNotFound, MenuUnavailable, fetchMenu, readSnapshot, saveSnapshot } from '../lib/api';
-import { applyTheme, coverStyle } from '../lib/theme';
+import { MenuNotFound, MenuUnavailable, readSnapshot } from '../lib/api';
+import { useMenu } from '../lib/useMenu';
+import type { Route } from '../lib/router';
+import { applyTheme } from '../lib/theme';
 import { loadDisplayFont } from '../lib/fonts';
 import { OfflineBanner } from '../components/OfflineBanner';
 import { CategoryNav } from '../components/CategoryNav';
@@ -19,29 +19,19 @@ import { MomentBanner } from '../components/MomentBanner';
 import { MenuSkeleton } from '../components/MenuSkeleton';
 import { ErrorScreen } from '../components/ErrorScreen';
 
-export function MenuPage(): JSX.Element {
-  const { slug } = useParams({ from: '/r/$slug' });
-  const { t: tableCode, locale: forcedLocale } = useSearch({ from: '/r/$slug' });
-  const { t, i18n } = useTranslation();
+export function MenuPage({ route }: { route: Route }): JSX.Element {
+  const slug = route.slug!;
+  const tableCode = route.table;
+  const { t } = useTranslation();
 
-  const [locale, setLocale] = useState<string | undefined>(forcedLocale);
+  const [locale, setLocale] = useState<string | undefined>(route.locale);
   const [selected, setSelected] = useState<PublicMenuItem | null>(null);
   const [online, setOnline] = useState(() => navigator.onLine);
   /** Réveil périodique : un menu laissé ouvert doit finir par se signaler comme daté. */
   const [, setTick] = useState(0);
 
-  /* Une seule requête peint toute la page. */
-  const query = useQuery({
-    queryKey: ['menu', slug, locale ?? 'default'],
-    queryFn: () => fetchMenu(slug, locale),
-    // La dernière carte connue s'affiche immédiatement, avant même la réponse réseau.
-    initialData: () => readSnapshot(slug, locale ?? 'default')?.payload,
-    initialDataUpdatedAt: () => {
-      const saved = readSnapshot(slug, locale ?? 'default')?.savedAt;
-      return saved ? new Date(saved).getTime() : undefined;
-    },
-  });
-
+  /* Une seule requête peint toute la page ; la dernière carte connue s'affiche avant elle. */
+  const query = useMenu(slug, locale);
   const menu: PublicMenuResponse | undefined = query.data;
 
   useEffect(() => {
@@ -64,10 +54,8 @@ export function MenuPage(): JSX.Element {
     if (!menu) return;
     applyTheme(menu.restaurant.theme);
     void loadDisplayFont(menu.restaurant.theme.fontDisplay);
-    void i18n.changeLanguage(menu.locale);
     document.title = menu.restaurant.name;
-    saveSnapshot(slug, locale ?? 'default', menu);
-  }, [menu, slug, locale, i18n]);
+  }, [menu, slug, locale]);
 
   const savedAt = useMemo(
     () => readSnapshot(slug, locale ?? 'default')?.savedAt ?? null,
@@ -89,7 +77,7 @@ export function MenuPage(): JSX.Element {
   const STALE_AFTER_MS = 5 * 60 * 1000;
   const age = menu ? Date.now() - new Date(menu.generatedAt).getTime() : 0;
   const servingSnapshot =
-    Boolean(savedAt) && (!online || query.isError || age > STALE_AFTER_MS);
+    Boolean(savedAt) && (!online || Boolean(query.error) || age > STALE_AFTER_MS);
 
   /* Défilement vers une catégorie, sans dépendance ni calcul au scroll. */
   const sections = useRef(new Map<string, HTMLElement>());
@@ -105,7 +93,7 @@ export function MenuPage(): JSX.Element {
       <ErrorScreen
         title={error instanceof MenuNotFound ? t('notFound') : t('notFoundHelp')}
         detail={error instanceof MenuUnavailable ? error.message : t('notFoundHelp')}
-        onRetry={() => void query.refetch()}
+        onRetry={query.refetch}
       />
     );
   }
@@ -113,11 +101,25 @@ export function MenuPage(): JSX.Element {
   const { restaurant, opening, categories, moment } = menu;
 
   return (
+    <LocaleProvider value={menu.locale}>
     <div className="shell">
       {servingSnapshot && savedAt ? <OfflineBanner savedAt={menu.generatedAt} /> : null}
 
-      <header className="cover reveal" style={coverStyle(restaurant.coverUrl)}>
-        {!restaurant.coverUrl ? <div className="cover-grid" /> : null}
+      <header className="cover reveal">
+        {restaurant.coverUrl ? (
+          <img
+            src={restaurant.coverUrl}
+            alt=""
+            className="cover-photo"
+            width={1280}
+            height={640}
+            decoding="async"
+            fetchPriority="low"
+            onLoad={(event) => event.currentTarget.classList.add('is-loaded')}
+          />
+        ) : (
+          <div className="cover-grid" />
+        )}
         {restaurant.enabledLocales.length > 1 ? (
           <LanguageSwitch
             locales={restaurant.enabledLocales}
@@ -196,5 +198,6 @@ export function MenuPage(): JSX.Element {
         onClose={() => setSelected(null)}
       />
     </div>
+    </LocaleProvider>
   );
 }

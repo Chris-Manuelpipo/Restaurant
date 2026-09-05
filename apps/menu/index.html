@@ -15,10 +15,104 @@
       :root { color-scheme: dark; }
       html, body { margin: 0; background: #17130F; }
       #root { min-height: 100dvh; }
+
+      /* Géométrie de l'en-tête, partagée par le pré-rendu ci-dessous et par React.
+         Les deux doivent coïncider au pixel près : c'est ce qui évite tout sursaut. */
+      #evx-head { max-width: 520px; margin: 0 auto; }
+      #evx-head .c { height: 196px; position: relative; overflow: hidden; }
+      #evx-head .c img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+      #evx-head .i { padding: 0 20px 18px; margin-top: -46px; position: relative; }
+      #evx-head .l {
+        width: 88px; height: 88px; border-radius: 26px; overflow: hidden;
+        box-shadow: 0 14px 34px rgba(0,0,0,.35);
+      }
+      #evx-head .l img { width: 100%; height: 100%; object-fit: cover; display: block; }
+      #evx-head h1 {
+        font: 600 33px/1.08 Georgia, serif; letter-spacing: -.015em;
+        margin: 16px 0 0; color: #F6F1EA;
+      }
+      #evx-head p {
+        margin: 7px 0 0; font: 400 14.5px/1.5 system-ui, sans-serif;
+        max-width: 34ch; opacity: .62;
+      }
     </style>
   </head>
   <body>
     <div id="root"></div>
+
+    <!--
+      Deux choses se jouent ici, et elles décident du ressenti sur un réseau lent :
+
+      1. la requête du menu part **avant** le téléchargement du JavaScript — attendre que
+         React soit chargé pour seulement *demander* la carte coûte une seconde pleine ;
+
+      2. dès la réponse, on peint l'en-tête à la main. Sans cela, le premier contenu utile
+         n'apparaîtrait qu'après React et ses dépendances, soit trois secondes plus tard sur
+         une 4G lente. React reprend ensuite la main sur le même écran, à l'identique.
+
+      Un kilo-octet de script pour deux secondes gagnées : le calcul est vite fait.
+    -->
+    <script>
+      (function () {
+        var match = location.pathname.match(/^\/r\/([^/]+)/);
+        if (!match) return;
+
+        var locale = new URLSearchParams(location.search).get('locale');
+        var url = '__API_URL__/api/v1/public/r/' + match[1] + '/menu';
+        if (locale) url += '?locale=' + encodeURIComponent(locale);
+
+        var promise = fetch(url);
+        window.__evolyxMenu = { slug: match[1], locale: locale, promise: promise };
+
+        promise
+          .then(function (response) {
+            return response.ok ? response.clone().json() : null;
+          })
+          .then(function (menu) {
+            // React a peut-être déjà pris la main : dans ce cas, on ne touche à rien.
+            if (!menu || document.getElementById('root').childElementCount > 0) return;
+
+            var theme = menu.restaurant.theme || {};
+            var primary = theme.primary || '#FF6A2C';
+            var background = theme.background || '#17130F';
+            document.documentElement.style.background = background;
+            document.body.style.background = background;
+
+            var head = document.createElement('div');
+            head.id = 'evx-head';
+            // La photo de couverture part d'ici, en parallèle du JavaScript : découverte
+            // après React, elle arriverait trois secondes plus tard et deviendrait à elle
+            // seule le « plus grand contenu » de la page.
+            head.innerHTML =
+              '<div class="c" style="background:linear-gradient(140deg,' +
+              primary +
+              ' 0%,' +
+              primary +
+              ' 100%)">' +
+              (menu.restaurant.coverUrl
+                ? '<img src="__API_URL__' +
+                  menu.restaurant.coverUrl +
+                  '" alt="" fetchpriority="high" decoding="async">'
+                : '') +
+              '</div>' +
+              '<div class="i"><div class="l" style="background:' +
+              background +
+              ';border:1px solid rgba(255,255,255,.08)">' +
+              (menu.restaurant.logoUrl
+                ? '<img src="__API_URL__' + menu.restaurant.logoUrl + '" alt="">'
+                : '') +
+              '</div><h1></h1><p></p></div>';
+
+            head.querySelector('h1').textContent = menu.restaurant.name;
+            head.querySelector('p').textContent = menu.restaurant.tagline || '';
+            document.getElementById('root').append(head);
+          })
+          .catch(function () {
+            /* Hors ligne ou serveur muet : React affichera l'écran adéquat. */
+          });
+      })();
+    </script>
+
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

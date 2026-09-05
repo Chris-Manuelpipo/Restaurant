@@ -1,0 +1,147 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Secrets de test : la CI n'accède à aucune donnée réelle.
+  JWT_ACCESS_SECRET: ci-access-secret-de-trente-deux-caracteres-minimum
+  JWT_REFRESH_SECRET: ci-refresh-secret-de-trente-deux-caracteres-minimum
+  DATABASE_URL: postgresql://postgres:postgres@localhost:5432/evolyx_restaurant?schema=public
+  TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/evolyx_restaurant_test?schema=public
+  SEED_PASSWORD: MotDePasseDemo2026
+
+jobs:
+  qualite:
+    name: Lint, typage et tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: evolyx_restaurant
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Préparer la base de test
+        run: psql "$DATABASE_URL" -c 'CREATE DATABASE evolyx_restaurant_test;'
+        env:
+          PGPASSWORD: postgres
+
+      - name: Construire le package partagé
+        run: pnpm --filter @evolyx/shared build
+
+      - name: Générer le client Prisma
+        run: pnpm --filter @evolyx/api db:generate
+
+      - name: Typage
+        run: pnpm -r typecheck
+
+      - name: Tests unitaires et d'intégration
+        run: |
+          pnpm --filter @evolyx/shared test
+          pnpm --filter @evolyx/api test
+
+      - name: Couverture du domaine (seuil 80 %)
+        run: pnpm --filter @evolyx/api test:coverage
+
+      - name: Construire les applications
+        run: pnpm build
+
+      - name: Budget de performance du menu client
+        run: node apps/menu/scripts/budget.mjs
+
+  recette:
+    name: Recette de bout en bout
+    runs-on: ubuntu-latest
+    needs: qualite
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: evolyx_restaurant
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      API_PORT: 3010
+      API_PUBLIC_URL: http://localhost:3010
+      ADMIN_URL: http://localhost:5180
+      PUBLIC_MENU_URL: http://localhost:5181
+      VITE_API_URL: http://localhost:3010
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @evolyx/shared build
+      - run: pnpm --filter @evolyx/api db:generate
+      - run: pnpm --filter @evolyx/api db:migrate
+      - run: pnpm seed
+
+      - name: Installer Chrome pour Playwright
+        run: pnpm --filter @evolyx/e2e exec playwright install --with-deps chrome
+
+      # Playwright démarre lui-même l'API, le back-office et le menu construit.
+      - name: Parcours de recette
+        run: pnpm e2e
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: rapport-playwright
+          path: e2e/playwright-report/
+          retention-days: 7
+
+  docker:
+    name: Construction des images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Construire les trois cibles
+        run: |
+          docker build --target api   -t evolyx-api:ci   .
+          docker build --target admin -t evolyx-admin:ci .
+          docker build --target menu  -t evolyx-menu:ci  .

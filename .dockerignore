@@ -1,0 +1,12 @@
+node_modules
+**/node_modules
+**/dist
+**/.turbo
+**/coverage
+.git
+.env
+.env.local
+e2e/test-results
+e2e/playwright-report
+apps/api/storage
+docs/maquettes

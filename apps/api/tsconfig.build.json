@@ -1,6 +1,9 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    // `rootDir` n'a de sens qu'à la compilation : le typage, lui, couvre aussi le seed,
+    // qui vit dans prisma/ et n'est jamais émis.
+    "rootDir": "./src",
     "noEmit": false
   },
   "include": ["src/**/*"],

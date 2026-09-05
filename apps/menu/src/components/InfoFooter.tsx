@@ -1,6 +1,6 @@
-import { useTranslation } from 'react-i18next';
+import { DAY_NAMES, useTranslation } from '../lib/i18n';
 import type { PublicOpening, PublicRestaurant } from '@evolyx/shared';
-import { DAY_NAMES } from '../lib/i18n';
+
 import type { JSX } from 'react';
 
 /**
@@ -18,8 +18,8 @@ export function InfoFooter({
   opening: PublicOpening;
   tableCode?: string;
 }): JSX.Element {
-  const { t, i18n } = useTranslation();
-  const days = DAY_NAMES[i18n.language] ?? DAY_NAMES.fr!;
+  const { t, locale } = useTranslation();
+  const days = DAY_NAMES[locale] ?? DAY_NAMES.fr!;
   const today = new Date().getDay();
 
   const maps = restaurant.address

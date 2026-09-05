@@ -501,7 +501,7 @@ async function seedRestaurant(seed: Seed, passwordHash: string): Promise<void> {
   // Logo et couverture : des dégradés générés, aucune photo tierce.
   const storage = getStorage();
   const logo = await generatePlaceholder(seed.theme.primary, seed.theme.background, 512, 512);
-  const cover = await generatePlaceholder(seed.theme.background, seed.theme.primary, 1280, 640);
+  const cover = await generatePlaceholder(seed.theme.background, seed.theme.primary, 960, 480);
   const logoKey = `restaurants/${restaurant.id}/logo-seed.webp`;
   const coverKey = `restaurants/${restaurant.id}/cover-seed.webp`;
   await storage.put(logoKey, logo, 'image/webp');

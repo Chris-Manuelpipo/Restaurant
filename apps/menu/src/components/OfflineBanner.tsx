@@ -1,4 +1,4 @@
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '../lib/i18n';
 import type { JSX } from 'react';
 
 /**
@@ -6,9 +6,9 @@ import type { JSX } from 'react';
  * Le client doit savoir que la carte peut avoir bougé — sans que cela l'empêche de la lire.
  */
 export function OfflineBanner({ savedAt }: { savedAt: string }): JSX.Element {
-  const { t, i18n } = useTranslation();
+  const { t, locale } = useTranslation();
 
-  const date = new Intl.DateTimeFormat(i18n.language, {
+  const date = new Intl.DateTimeFormat(locale, {
     day: 'numeric',
     month: 'short',
     hour: '2-digit',

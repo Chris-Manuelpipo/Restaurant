@@ -1,75 +1,38 @@
-import { StrictMode } from 'react';
+import { StrictMode, type JSX } from 'react';
 import { createRoot } from 'react-dom/client';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import {
-  RouterProvider,
-  createRootRoute,
-  createRoute,
-  createRouter,
-  Outlet,
-} from '@tanstack/react-router';
 
 import './styles.css';
-import './lib/i18n';
 import { MenuPage } from './routes/MenuPage';
 import { Landing } from './routes/Landing';
+import { useRoute } from './lib/router';
 import { loadBodyFont } from './lib/fonts';
 
 /**
- * Le menu client tient en deux routes : la page d'un restaurant, et un écran d'aide pour
- * qui arrive à la racine sans avoir scanné de code.
+ * Point d'entrée du menu client.
+ *
+ * Volontairement dépouillé : chaque kilo-octet ici retarde l'apparition de la carte sur le
+ * téléphone d'un client debout dans une salle. Voir docs/PERFORMANCE.md.
  */
-
-const rootRoute = createRootRoute({ component: () => <Outlet /> });
-
-const indexRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/',
-  component: Landing,
-});
-
-const menuRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/r/$slug',
-  component: MenuPage,
-  validateSearch: (search: Record<string, unknown>) => ({
-    /** Code de la table, transmis par la redirection du QR. Sert au pied de page. */
-    t: typeof search.t === 'string' ? search.t : undefined,
-    locale: typeof search.locale === 'string' ? search.locale : undefined,
-  }),
-});
-
-const router = createRouter({
-  routeTree: rootRoute.addChildren([indexRoute, menuRoute]),
-  defaultPreload: false,
-});
-
-declare module '@tanstack/react-router' {
-  interface Register {
-    router: typeof router;
-  }
+function App(): JSX.Element {
+  const route = useRoute();
+  return route.slug ? <MenuPage route={route} /> : <Landing />;
 }
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      // Le menu vit une minute : c'est la fenêtre annoncée par le cache HTTP.
-      staleTime: 60_000,
-      gcTime: 24 * 60 * 60 * 1000,
-      retry: 1,
-      refetchOnWindowFocus: true,
-      refetchOnReconnect: true,
-    },
-  },
-});
-
-// La police de corps part après le premier rendu : le texte s'affiche d'abord, s'affine ensuite.
+// La police de corps part après le premier rendu, quand le réseau s'est libéré.
 void loadBodyFont();
+
+/**
+ * Le service worker s'installe une fois la page chargée. C'est lui qui rendra la carte
+ * consultable hors ligne — mais au premier scan, l'urgence est d'afficher le menu.
+ */
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => {
+    setTimeout(() => void navigator.serviceWorker.register('/sw.js'), 1500);
+  });
+}
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>
+    <App />
   </StrictMode>,
 );
