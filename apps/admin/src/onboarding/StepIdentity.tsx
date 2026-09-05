@@ -1,5 +1,5 @@
 import { useRef, useState, type FormEvent, type JSX } from 'react';
-import { Button, Field, Input, useToast } from '@evolyx/ui';
+import { Button, Field, Input, SceneIdentity, useToast } from '@evolyx/ui';
 import { api, mediaUrl } from '../lib/api';
 import type { StepProps } from './types';
 
@@ -39,6 +39,7 @@ export function StepIdentity({ draft, onChange, onNext }: StepProps): JSX.Elemen
 
   return (
     <form id="step-identity" onSubmit={submit}>
+      <SceneIdentity />
       <span className="eyebrow">Identité</span>
       <h1 className="page-title">Commençons par votre enseigne.</h1>
       <p className="page-lede">

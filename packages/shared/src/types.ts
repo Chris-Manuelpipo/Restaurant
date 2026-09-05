@@ -68,7 +68,10 @@ export interface PublicPromo {
 export interface PublicCategory {
   id: string;
   name: string;
+  /** « emoji:🔥 », « icon:flame », ou un emoji nu. Voir parseCategoryVisual(). */
   icon: string | null;
+  /** Photo de catégorie ; elle prime sur l'icône à l'affichage. */
+  imageUrl: string | null;
   color: string | null;
   items: PublicMenuItem[];
 }

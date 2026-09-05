@@ -13,7 +13,10 @@ import { ITEM_STATUSES } from '../constants.js';
 
 export const createCategorySchema = z.object({
   name: i18nTextSchema,
-  icon: z.string().trim().max(8).nullable().optional(),
+  /** « emoji:🔥 », « icon:flame », ou un emoji nu (ancien format toléré). */
+  icon: z.string().trim().max(64).nullable().optional(),
+  /** Photo de catégorie : renseignée par l'envoi de fichier, pas saisie à la main. */
+  imageUrl: z.string().trim().max(300).nullable().optional(),
   color: hexColorSchema.nullable().optional(),
   isVisible: z.boolean().default(true),
   position: positionSchema.optional(),

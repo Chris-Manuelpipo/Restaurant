@@ -58,6 +58,8 @@ type SeedItem = {
   badge?: Record<string, string>;
   isPerPerson?: boolean;
   photo?: [string, string];
+  /** Photos supplémentaires : elles n'apparaissent que dans la fiche du plat. */
+  extraPhotos?: [string, string][];
 };
 
 type SeedRule = {
@@ -98,7 +100,7 @@ const braise: Seed = {
   categories: [
     {
       name: { fr: 'Grillades' },
-      icon: '🔥',
+      icon: 'emoji:🔥',
       items: [
         {
           name: { fr: 'Poulet braisé entier' },
@@ -143,7 +145,7 @@ const braise: Seed = {
     },
     {
       name: { fr: 'Poissons' },
-      icon: '🐟',
+      icon: 'emoji:🐟',
       items: [
         {
           name: { fr: 'Maquereau braisé' },
@@ -162,6 +164,10 @@ const braise: Seed = {
           prepMinutes: 20,
           allergens: ['poisson', 'arachide'],
           photo: ['#0F3D4A', '#3E8FA6'],
+          extraPhotos: [
+            ['#123A2E', '#4FA88B'],
+            ['#3A2410', '#C98A3E'],
+          ],
         },
         {
           name: { fr: 'Bar entier grillé' },
@@ -188,7 +194,7 @@ const braise: Seed = {
     },
     {
       name: { fr: 'Accompagnements' },
-      icon: '🍠',
+      icon: 'emoji:🍠',
       items: [
         { name: { fr: 'Bâton de manioc' }, price: 300 },
         { name: { fr: 'Plantains braisés' }, price: 1000 },
@@ -197,7 +203,7 @@ const braise: Seed = {
     },
     {
       name: { fr: 'Boissons' },
-      icon: '🥤',
+      icon: 'emoji:🥤',
       items: [
         { name: { fr: 'Jus de gingembre' }, description: { fr: 'Pressé le matin, servi très frais.' }, price: 1000 },
         { name: { fr: 'Bissap' }, price: 1000 },
@@ -254,7 +260,7 @@ const casa: Seed = {
   categories: [
     {
       name: { fr: 'Pizzas', en: 'Pizzas' },
-      icon: '🍕',
+      icon: 'icon:pizza',
       items: [
         {
           name: { fr: 'Margherita', en: 'Margherita' },
@@ -274,6 +280,7 @@ const casa: Seed = {
           prepMinutes: 12,
           allergens: ['gluten', 'lait'],
           photo: ['#1B2F7A', '#5A7FE0'],
+          extraPhotos: [['#24357F', '#8FA6EC']],
         },
         {
           name: { fr: 'Reine', en: 'Queen' },
@@ -313,7 +320,7 @@ const casa: Seed = {
     },
     {
       name: { fr: 'Entrées', en: 'Starters' },
-      icon: '🥗',
+      icon: 'icon:salad',
       items: [
         {
           name: { fr: 'Bruschetta', en: 'Bruschetta' },
@@ -334,7 +341,7 @@ const casa: Seed = {
     },
     {
       name: { fr: 'Pâtes', en: 'Pasta' },
-      icon: '🍝',
+      icon: 'icon:wheat',
       items: [
         {
           name: { fr: 'Spaghetti bolognaise', en: 'Spaghetti bolognese' },
@@ -352,7 +359,7 @@ const casa: Seed = {
     },
     {
       name: { fr: 'Brunch', en: 'Brunch' },
-      icon: '🥞',
+      icon: 'icon:eggFried',
       items: [
         {
           name: { fr: 'Formule brunch', en: 'Brunch set' },
@@ -374,7 +381,7 @@ const casa: Seed = {
     },
     {
       name: { fr: 'Cocktails', en: 'Cocktails' },
-      icon: '🍸',
+      icon: 'icon:martini',
       items: [
         {
           name: { fr: 'Mojito', en: 'Mojito' },
@@ -387,7 +394,7 @@ const casa: Seed = {
     },
     {
       name: { fr: 'Desserts', en: 'Desserts' },
-      icon: '🍰',
+      icon: 'icon:cakeSlice',
       items: [
         {
           name: { fr: 'Tiramisu', en: 'Tiramisu' },
@@ -400,7 +407,7 @@ const casa: Seed = {
     },
     {
       name: { fr: 'Boissons chaudes', en: 'Hot drinks' },
-      icon: '☕',
+      icon: 'icon:coffee',
       items: [
         { name: { fr: 'Espresso', en: 'Espresso' }, price: 1000 },
         { name: { fr: 'Cappuccino', en: 'Cappuccino' }, price: 1500, allergens: ['lait'] },
@@ -408,7 +415,7 @@ const casa: Seed = {
     },
     {
       name: { fr: 'Boissons fraîches', en: 'Cold drinks' },
-      icon: '🧃',
+      icon: 'icon:glassWater',
       items: [
         { name: { fr: 'Limonade maison', en: 'Homemade lemonade' }, price: 1500 },
         { name: { fr: 'Eau minérale 1 L', en: 'Still water 1 L' }, price: 800 },
@@ -416,7 +423,7 @@ const casa: Seed = {
     },
     {
       name: { fr: 'Vins', en: 'Wines' },
-      icon: '🍷',
+      icon: 'icon:wine',
       items: [
         {
           name: { fr: 'Verre de rouge', en: 'Glass of red' },
@@ -591,10 +598,11 @@ async function seedRestaurant(seed: Seed, passwordHash: string): Promise<void> {
       );
       itemCount += 1;
 
-      if (item.photo) {
-        const [from, to] = item.photo;
+      const photos = item.photo ? [item.photo, ...(item.extraPhotos ?? [])] : [];
+
+      for (const [position, [from, to]] of photos.entries()) {
         const key = (variant: string): string =>
-          `restaurants/${restaurant.id}/menu-items/${menuItem.id}/seed-${variant}.webp`;
+          `restaurants/${restaurant.id}/menu-items/${menuItem.id}/seed-${position}-${variant}.webp`;
 
         for (const [variant, width, height] of [
           ['thumb', 160, 160],
@@ -611,7 +619,7 @@ async function seedRestaurant(seed: Seed, passwordHash: string): Promise<void> {
               images: {
                 create: {
                   storageKey: key('large'),
-                  position: 0,
+                  position,
                   variants: {
                     thumb: storage.url(key('thumb')),
                     medium: storage.url(key('medium')),

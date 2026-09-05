@@ -6,6 +6,7 @@ import { scoped } from '../../lib/scope.js';
 import { requireAuth } from '../../plugins/auth.js';
 import { recordAudit } from '../../services/audit.js';
 import { AppError, notFound } from '../../lib/errors.js';
+import { processCategoryImage } from '../../services/images.js';
 import { json, owned } from '../../lib/prisma-helpers.js';
 
 /**
@@ -61,6 +62,7 @@ const categoryRoutes: FastifyPluginAsync = async (app) => {
         data: owned({
           name: json(body.name),
           icon: body.icon ?? null,
+          imageUrl: body.imageUrl ?? null,
           color: body.color ?? null,
           isVisible: body.isVisible,
           position: body.position ?? (last ? last.position + 1 : 0),
@@ -107,6 +109,7 @@ const categoryRoutes: FastifyPluginAsync = async (app) => {
         data: {
           ...(body.name ? { name: json(body.name) } : {}),
           ...(body.icon !== undefined ? { icon: body.icon } : {}),
+          ...(body.imageUrl !== undefined ? { imageUrl: body.imageUrl } : {}),
           ...(body.color !== undefined ? { color: body.color } : {}),
           ...(body.isVisible !== undefined ? { isVisible: body.isVisible } : {}),
           ...(body.position !== undefined ? { position: body.position } : {}),
@@ -184,6 +187,74 @@ const categoryRoutes: FastifyPluginAsync = async (app) => {
       });
 
       return archived;
+    }),
+  );
+
+  /**
+   * Photo de catégorie. Elle prime sur l'icône à l'affichage : un restaurant qui a une belle
+   * photo de ses grillades a intérêt à la montrer plutôt qu'un pictogramme.
+   */
+  app.post(
+    '/:id/image',
+    {
+      onRequest: [app.requires(CAPABILITIES.MENU_WRITE)],
+      schema: {
+        tags: ['menu'],
+        summary: 'Envoie la photo d’une catégorie (multipart)',
+        security: [{ bearerAuth: [] }],
+        params: idParam,
+        consumes: ['multipart/form-data'],
+      },
+    },
+    scoped(async (request, _reply, db) => {
+      const auth = requireAuth(request);
+      const { id } = request.params as { id: string };
+
+      const category = await db.category.findUnique({ where: { id } });
+      if (!category) throw notFound('Cette catégorie');
+
+      const file = await request.file();
+      if (!file) throw new AppError('VALIDATION_ERROR', 'Aucun fichier reçu.');
+
+      const buffer = await file.toBuffer();
+      const { url } = await processCategoryImage(buffer, file.mimetype, auth.restaurantId!, id);
+
+      const updated = await db.category.update({ where: { id }, data: { imageUrl: url } });
+
+      await app.events.publish('category.updated', {
+        restaurantId: auth.restaurantId!,
+        categoryId: id,
+        userId: auth.userId,
+      });
+
+      return updated;
+    }),
+  );
+
+  app.delete(
+    '/:id/image',
+    {
+      onRequest: [app.requires(CAPABILITIES.MENU_WRITE)],
+      schema: {
+        tags: ['menu'],
+        summary: 'Retire la photo d’une catégorie',
+        security: [{ bearerAuth: [] }],
+        params: idParam,
+      },
+    },
+    scoped(async (request, _reply, db) => {
+      const auth = requireAuth(request);
+      const { id } = request.params as { id: string };
+
+      const updated = await db.category.update({ where: { id }, data: { imageUrl: null } });
+
+      await app.events.publish('category.updated', {
+        restaurantId: auth.restaurantId!,
+        categoryId: id,
+        userId: auth.userId,
+      });
+
+      return updated;
     }),
   );
 

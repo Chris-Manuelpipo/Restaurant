@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router';
 import { Button, Spin } from '@evolyx/ui';
 import { MODULES } from '@evolyx/shared';
@@ -117,10 +117,34 @@ const SECTION_LABELS: Record<NavEntry['section'], string> = {
   plateforme: 'Plateforme',
 };
 
+/** Le repli du rail est un réglage de poste de travail : il survit au rechargement. */
+const RAIL_KEY = 'evolyx:rail-collapsed';
+
+function readCollapsed(): boolean {
+  try {
+    return localStorage.getItem(RAIL_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
 export function AppShell(): JSX.Element {
   const { session, isLoading, can, hasModule } = useSession();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const [collapsed, setCollapsed] = useState(readCollapsed);
+
+  const toggleRail = (): void => {
+    setCollapsed((current) => {
+      const next = !current;
+      try {
+        localStorage.setItem(RAIL_KEY, next ? '1' : '0');
+      } catch {
+        /* stockage refusé : le réglage vaudra pour la session */
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (!isLoading && !session) void navigate({ to: '/connexion' });
@@ -147,22 +171,39 @@ export function AppShell(): JSX.Element {
   const onboardingPending = restaurant && restaurant.onboardingCompletedAt === null;
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-collapsed={collapsed || undefined}>
       <aside className="rail">
         <div className="brand">
           <div className="brand__mark">E</div>
-          <div className="min-w-0">
+          <div className="min-w-0 rail-label">
             <b className="brand__name">Evolyx</b>
             <span className="brand__sub">{restaurant?.name ?? 'Plateforme'}</span>
           </div>
+          <button
+            type="button"
+            className="rail-toggle"
+            onClick={toggleRail}
+            aria-label={collapsed ? 'Déplier le menu' : 'Replier le menu'}
+            title={collapsed ? 'Déplier le menu' : 'Replier le menu'}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">
+              <rect x="3" y="4" width="18" height="16" rx="2" />
+              <path d="M9 4v16" />
+            </svg>
+          </button>
         </div>
 
         {onboardingPending ? (
-          <Link to="/mise-en-service" className="nav-link" data-active={pathname === '/mise-en-service'}>
+          <Link
+            to="/mise-en-service"
+            className="nav-link"
+            data-active={pathname === '/mise-en-service'}
+            title="Terminer la mise en service"
+          >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
               <path d="M12 2 15 9l7 .6-5.3 4.6L18.2 21 12 17.3 5.8 21l1.5-6.8L2 9.6 9 9z" />
             </svg>
-            Terminer la mise en service
+            <span className="rail-label">Terminer la mise en service</span>
           </Link>
         ) : null}
 
@@ -172,16 +213,17 @@ export function AppShell(): JSX.Element {
             if (entries.length === 0) return null;
             return (
               <div key={section}>
-                <p className="nav-kicker">{SECTION_LABELS[section]}</p>
+                <p className="nav-kicker rail-label">{SECTION_LABELS[section]}</p>
                 {entries.map((entry) => (
                   <Link
                     key={entry.to}
                     to={entry.to}
                     className="nav-link"
                     data-active={pathname === entry.to}
+                    title={entry.label}
                   >
                     {entry.icon}
-                    {entry.label}
+                    <span className="rail-label">{entry.label}</span>
                   </Link>
                 ))}
               </div>
@@ -189,20 +231,26 @@ export function AppShell(): JSX.Element {
           })}
         </nav>
 
-        <div className="pt-4 border-t" style={{ borderColor: 'var(--rule-2)' }}>
-          <p className="text-[12.5px] font-semibold truncate">{session.user.fullName}</p>
-          <p className="text-[11.5px] mb-3" style={{ color: 'var(--ink-3)' }}>
-            {roleLabel(session.user.role)}
-          </p>
+        <div className="rail-foot">
+          <div className="rail-label">
+            <p className="text-[12.5px] font-semibold truncate">{session.user.fullName}</p>
+            <p className="text-[11.5px] mb-3" style={{ color: 'var(--ink-3)' }}>
+              {roleLabel(session.user.role)}
+            </p>
+          </div>
           <Button
             variant="ghost"
             size="sm"
+            title="Se déconnecter"
             onClick={async () => {
               await logout();
               void navigate({ to: '/connexion' });
             }}
           >
-            Se déconnecter
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
+            </svg>
+            <span className="rail-label">Se déconnecter</span>
           </Button>
         </div>
       </aside>

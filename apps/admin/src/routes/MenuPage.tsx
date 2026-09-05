@@ -1,77 +1,79 @@
 import { useMemo, useState, type JSX } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  Badge,
+  Breadcrumb,
   Button,
+  CategoryGlyph,
   EmptyState,
-  Field,
-  Input,
-  Modal,
-  Select,
+  SearchInput,
+  SegmentedControl,
   Spin,
-  Textarea,
+  StatCard,
+  StatRow,
   useToast,
 } from '@evolyx/ui';
-import {
-  COMMON_ALLERGENS,
-  formatAmount,
-  resolveI18n,
-  type I18nText,
-  type ItemStatus,
-} from '@evolyx/shared';
+import { formatAmount, resolveI18n, type ItemStatus } from '@evolyx/shared';
 import { ApiRequestError, api, mediaUrl } from '../lib/api';
 import { useSession } from '../lib/session';
 import { PageHeader } from '../components/PageHeader';
+import { CategoryCard } from '../components/menu/CategoryCard';
+import { CategoryDrawer } from '../components/menu/CategoryDrawer';
+import { ItemDrawer } from '../components/menu/ItemDrawer';
+import { ItemList } from '../components/menu/ItemList';
+import { displayPrice, type CategoryRow, type ItemRow } from '../components/menu/types';
 
 /**
- * La carte — l'écran ouvert le plus souvent.
+ * La carte — l'écran le plus ouvert du back-office.
  *
- * Deux gestes doivent tenir en un clic, depuis un téléphone, en plein service :
- * marquer un plat épuisé, et corriger un prix. Tout le reste (créer, décrire, photographier)
- * se fait au calme, et peut prendre le temps d'une fenêtre.
+ * Deux vues, et une seule idée : ne jamais afficher plus d'une catégorie de plats à la fois.
+ * Une vraie carte compte des dizaines de plats ; les empiler tous dans une page revient à
+ * demander au gérant de faire défiler pour trouver le poulet.
+ *
+ *   1. **Les catégories**, en cartes cliquables — chacune dit combien de plats elle contient,
+ *      combien sont épuisés, et si le client la voit.
+ *   2. **Les plats d'une catégorie**, en grille ou en liste, avec une barre de catégories qui
+ *      permet de sauter à la suivante sans repasser par l'accueil.
+ *
+ * Et par-dessus les deux : une recherche qui traverse toute la carte, pour le cas — fréquent —
+ * où l'on cherche un plat sans se souvenir de son rangement.
  */
 
-interface CategoryRow {
-  id: string;
-  name: I18nText;
-  icon: string | null;
-  position: number;
-  isVisible: boolean;
-  archivedAt: string | null;
-  _count?: { menuItems: number };
-}
+type Density = 'grid' | 'list';
+type Filter = 'all' | 'sold_out' | 'no_photo';
 
-interface ItemRow {
-  id: string;
-  categoryId: string;
-  name: I18nText;
-  description: I18nText | null;
-  basePrice: number | null;
-  prepMinutes: number | null;
-  allergens: string[];
-  badge: I18nText | null;
-  status: ItemStatus;
-  position: number;
-  archivedAt: string | null;
-  variants: { id: string; name: I18nText; price: number }[];
-  supplements: { id: string; name: I18nText; price: number }[];
-  images: { id: string; variants: { thumb: string } }[];
-}
+/** Pseudo-catégorie : « toute la carte », utilisée par les filtres transversaux. */
+const ALL_CATEGORIES = '__all__';
+
+const DENSITY_KEY = 'evolyx:menu-density';
+
+/**
+ * Tableaux vides **stables** : `?? []` produirait un nouveau tableau à chaque rendu, et tous
+ * les `useMemo` qui en dépendent se recalculeraient pour rien — sur une carte de cent plats,
+ * cela se voit.
+ */
+const NO_CATEGORIES: CategoryRow[] = [];
+const NO_ITEMS: ItemRow[] = [];
 
 export function MenuPage(): JSX.Element {
   const toast = useToast();
   const queryClient = useQueryClient();
   const { can } = useSession();
+  const writable = can('menu:write');
 
-  const [editing, setEditing] = useState<ItemRow | 'new' | null>(null);
-  const [categoryModal, setCategoryModal] = useState<CategoryRow | 'new' | null>(null);
-  const [filter, setFilter] = useState<'all' | 'sold_out'>('all');
+  /* La catégorie ouverte : null = on est sur la vue des catégories. */
+  const [openCategoryId, setOpenCategoryId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState<Filter>('all');
+  const [density, setDensity] = useState<Density>(() => readDensity());
+
+  const [editingItem, setEditingItem] = useState<ItemRow | 'new' | null>(null);
+  const [editingCategory, setEditingCategory] = useState<CategoryRow | 'new' | null>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
 
   const categories = useQuery({
     queryKey: ['categories'],
     queryFn: () => api.get<CategoryRow[]>('/categories'),
   });
-
   const items = useQuery({
     queryKey: ['menu-items'],
     queryFn: () => api.get<ItemRow[]>('/menu-items'),
@@ -102,61 +104,251 @@ export function MenuPage(): JSX.Element {
       toast.error("Le changement n'a pas été enregistré.");
     },
     onSuccess: (_data, { status }) => {
-      toast.success(
-        status === 'SOLD_OUT' ? 'Plat marqué épuisé.' : 'Plat de nouveau disponible.',
-      );
+      toast.success(status === 'SOLD_OUT' ? 'Plat marqué épuisé.' : 'Plat de nouveau disponible.');
       void invalidate();
     },
   });
 
-  const archive = useMutation({
-    mutationFn: (id: string) => api.delete(`/menu-items/${id}`),
-    onSuccess: async () => {
-      toast.success('Plat archivé.');
-      await invalidate();
-    },
+  const reorderCategories = useMutation({
+    mutationFn: (ids: string[]) => api.post('/categories/reorder', { ids }),
+    onSuccess: () => void invalidate(),
     onError: (error) =>
-      toast.error(error instanceof ApiRequestError ? error.message : 'Archivage impossible.'),
+      toast.error(error instanceof ApiRequestError ? error.message : 'Réordonnancement impossible.'),
   });
 
-  const byCategory = useMemo(() => {
+  /* ── Données dérivées ───────────────────────────────────────────────────── */
+
+  const allCategories = categories.data ?? NO_CATEGORIES;
+  const allItems = items.data ?? NO_ITEMS;
+
+  const itemsByCategory = useMemo(() => {
     const map = new Map<string, ItemRow[]>();
-    for (const item of items.data ?? []) {
-      if (filter === 'sold_out' && item.status !== 'SOLD_OUT') continue;
+    for (const item of allItems) {
       const list = map.get(item.categoryId) ?? [];
       list.push(item);
       map.set(item.categoryId, list);
     }
     return map;
-  }, [items.data, filter]);
+  }, [allItems]);
+
+  const stats = useMemo(() => {
+    const soldOut = allItems.filter((item) => item.status === 'SOLD_OUT').length;
+    const noPhoto = allItems.filter((item) => item.images.length === 0).length;
+    const priced = allItems.map((item) => displayPrice(item).amount).filter((amount) => amount > 0);
+    const average = priced.length
+      ? Math.round(priced.reduce((sum, amount) => sum + amount, 0) / priced.length)
+      : 0;
+    return { total: allItems.length, soldOut, noPhoto, average, categories: allCategories.length };
+  }, [allItems, allCategories]);
+
+  const searching = search.trim().length > 0;
+
+  const visibleItems = useMemo(() => {
+    let list = searching
+      ? allItems.filter((item) => matches(item, search))
+      : openCategoryId === ALL_CATEGORIES
+        ? allItems
+        : (itemsByCategory.get(openCategoryId ?? '') ?? []);
+
+    if (filter === 'sold_out') list = list.filter((item) => item.status === 'SOLD_OUT');
+    if (filter === 'no_photo') list = list.filter((item) => item.images.length === 0);
+    return list;
+  }, [allItems, itemsByCategory, openCategoryId, search, searching, filter]);
+
+  const openCategory = allCategories.find((category) => category.id === openCategoryId) ?? null;
+  const crossCutting = openCategoryId === ALL_CATEGORIES;
+
+  const categoryNameOf = (item: ItemRow): string | null => {
+    const found = allCategories.find((category) => category.id === item.categoryId);
+    return found ? resolveI18n(found.name) : null;
+  };
 
   if (categories.isLoading || items.isLoading) {
     return (
       <div className="grid place-items-center py-24">
-        <Spin />
+        <Spin label="Chargement de votre carte…" />
       </div>
     );
   }
 
-  const soldOutCount = (items.data ?? []).filter((item) => item.status === 'SOLD_OUT').length;
-  const writable = can('menu:write');
+  /* ── Vue « plats » — dans une catégorie, ou en résultat de recherche ────── */
+
+  if (openCategory || searching || crossCutting) {
+    return (
+      <>
+        <PageHeader
+          title={openCategory ? resolveI18n(openCategory.name) : filterTitle(filter, searching)}
+          lede={
+            openCategory
+              ? `${(itemsByCategory.get(openCategory.id) ?? []).length} plat(s) dans cette catégorie`
+              : `${visibleItems.length} plat(s) dans toute la carte`
+          }
+          actions={
+            writable ? (
+              <Button size="sm" variant="primary" onClick={() => setEditingItem('new')}>
+                Nouveau plat
+              </Button>
+            ) : null
+          }
+        />
+
+        <div className="page">
+          <div className="menu-toolbar">
+            <Breadcrumb
+              items={[
+                {
+                  label: 'La carte',
+                  onClick: () => {
+                    setOpenCategoryId(null);
+                    setSearch('');
+                    setFilter('all');
+                  },
+                },
+                { label: openCategory ? resolveI18n(openCategory.name) : filterTitle(filter, searching) },
+              ]}
+            />
+
+            <div className="flex items-center gap-2 flex-wrap">
+              <SearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder="Chercher un plat…"
+                className="min-w-[240px] flex-1"
+              />
+              <SegmentedControl<Density>
+                label="Densité d’affichage"
+                value={density}
+                onChange={(next) => {
+                  setDensity(next);
+                  writeDensity(next);
+                }}
+                options={[
+                  {
+                    value: 'grid',
+                    label: 'Grille',
+                    icon: (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <rect x="3" y="3" width="7" height="7" rx="1.5" />
+                        <rect x="14" y="3" width="7" height="7" rx="1.5" />
+                        <rect x="3" y="14" width="7" height="7" rx="1.5" />
+                        <rect x="14" y="14" width="7" height="7" rx="1.5" />
+                      </svg>
+                    ),
+                  },
+                  {
+                    value: 'list',
+                    label: 'Liste',
+                    icon: (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M4 6h16M4 12h16M4 18h16" />
+                      </svg>
+                    ),
+                  },
+                ]}
+              />
+            </div>
+          </div>
+
+          {/* Sauter d'une catégorie à l'autre sans revenir en arrière. */}
+          {!searching && !crossCutting ? (
+            <div className="cat-strip">
+              {allCategories.map((category) => {
+                const count = (itemsByCategory.get(category.id) ?? []).length;
+                return (
+                  <button
+                    key={category.id}
+                    type="button"
+                    aria-current={category.id === openCategoryId}
+                    onClick={() => {
+                      setOpenCategoryId(category.id);
+                      setFilter('all');
+                    }}
+                  >
+                    <CategoryGlyph
+                      icon={category.icon}
+                      imageUrl={mediaUrl(category.imageUrl)}
+                      name={resolveI18n(category.name)}
+                      size={22}
+                      className="evx-glyph !border-0 !bg-transparent"
+                    />
+                    {resolveI18n(category.name)}
+                    <span className="cat-strip__count">{count}</span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
+
+          {filter !== 'all' ? (
+            <button
+              type="button"
+              className="evx-btn evx-btn--ghost evx-btn--sm mb-3"
+              onClick={() => {
+                setFilter('all');
+                if (crossCutting) setOpenCategoryId(null);
+              }}
+            >
+              ← Retirer le filtre « {filter === 'sold_out' ? 'épuisés' : 'sans photo'} »
+            </button>
+          ) : null}
+
+          {visibleItems.length === 0 ? (
+            <EmptyState
+              title={searching ? 'Aucun plat ne correspond' : 'Cette catégorie est vide'}
+              description={
+                searching
+                  ? 'Essayez un autre mot, ou vérifiez l’orthographe.'
+                  : 'Ajoutez-y un premier plat — ou collez votre carte entière depuis la mise en service.'
+              }
+              action={
+                writable && !searching ? (
+                  <Button variant="primary" onClick={() => setEditingItem('new')}>
+                    Ajouter un plat
+                  </Button>
+                ) : null
+              }
+            />
+          ) : (
+            <ItemList
+              items={visibleItems}
+              density={density}
+              editable={writable || can('menu:status')}
+              pendingId={setStatus.isPending ? setStatus.variables?.id : undefined}
+              onToggleSoldOut={(item) =>
+                setStatus.mutate({
+                  id: item.id,
+                  status: item.status === 'SOLD_OUT' ? 'AVAILABLE' : 'SOLD_OUT',
+                })
+              }
+              onEdit={(item) => setEditingItem(item)}
+              categoryNameOf={searching || crossCutting ? categoryNameOf : undefined}
+            />
+          )}
+        </div>
+
+        {renderDrawers()}
+      </>
+    );
+  }
+
+  /* ── Vue « catégories » ─────────────────────────────────────────────────── */
 
   return (
     <>
       <PageHeader
         title="La carte"
-        lede="Marquez un plat épuisé d’un geste : votre menu client suit en moins d’une minute."
+        lede="Choisissez une catégorie pour voir ses plats."
         actions={
           writable ? (
             <>
-              <Button size="sm" onClick={() => setCategoryModal('new')}>
+              <Button size="sm" onClick={() => setEditingCategory('new')}>
                 Nouvelle catégorie
               </Button>
               <Button
                 size="sm"
                 variant="primary"
-                onClick={() => setEditing('new')}
-                disabled={(categories.data?.length ?? 0) === 0}
+                onClick={() => setEditingItem('new')}
+                disabled={allCategories.length === 0}
               >
                 Nouveau plat
               </Button>
@@ -166,558 +358,206 @@ export function MenuPage(): JSX.Element {
       />
 
       <div className="page">
-        <div className="flex items-center gap-2 mb-5">
-          <button
-            type="button"
-            className={`evx-btn evx-btn--sm ${filter === 'all' ? 'evx-btn--secondary' : 'evx-btn--ghost'}`}
-            onClick={() => setFilter('all')}
-          >
-            Tout ({items.data?.length ?? 0})
-          </button>
-          <button
-            type="button"
-            className={`evx-btn evx-btn--sm ${filter === 'sold_out' ? 'evx-btn--secondary' : 'evx-btn--ghost'}`}
-            onClick={() => setFilter('sold_out')}
-          >
-            Épuisés ({soldOutCount})
-          </button>
+        <StatRow>
+          <StatCard
+            label="Plats à la carte"
+            value={stats.total}
+            hint={`${stats.categories} catégorie${stats.categories > 1 ? 's' : ''}`}
+            tone="accent"
+            icon={
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <path d="M4 4h16v16H4zM4 9h16M9 9v11" />
+              </svg>
+            }
+          />
+          <StatCard
+            label="Épuisés"
+            value={stats.soldOut}
+            hint={stats.soldOut > 0 ? 'Visibles, marqués épuisés' : 'Tout est disponible'}
+            tone={stats.soldOut > 0 ? 'danger' : 'neutral'}
+            onClick={stats.soldOut > 0 ? () => openFiltered('sold_out') : undefined}
+            active={filter === 'sold_out'}
+            icon={
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <circle cx="12" cy="12" r="9" />
+                <path d="m8 8 8 8" />
+              </svg>
+            }
+          />
+          <StatCard
+            label="Sans photo"
+            value={stats.noPhoto}
+            hint={stats.noPhoto > 0 ? 'Une photo fait vendre' : 'Toutes illustrées'}
+            tone={stats.noPhoto > 0 ? 'warning' : 'neutral'}
+            onClick={stats.noPhoto > 0 ? () => openFiltered('no_photo') : undefined}
+            active={filter === 'no_photo'}
+            icon={
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <rect x="3" y="4" width="18" height="16" rx="2" />
+                <circle cx="9" cy="10" r="2" />
+                <path d="m3 17 5-4 4 3 3-2 6 5" />
+              </svg>
+            }
+          />
+          <StatCard
+            label="Prix moyen"
+            value={stats.average > 0 ? `${formatAmount(stats.average)} F` : '—'}
+            hint="Sur les plats affichés"
+            icon={
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <path d="M12 2v20M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+              </svg>
+            }
+          />
+        </StatRow>
+
+        <div className="menu-toolbar mt-6">
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder="Chercher un plat…  (touche /)"
+            className="max-w-[420px]"
+          />
         </div>
 
-        {(categories.data?.length ?? 0) === 0 ? (
+        {allCategories.length === 0 ? (
           <EmptyState
             title="Votre carte est vide"
             description="Créez une première catégorie — Grillades, Boissons — puis ajoutez-y vos plats. Vous pouvez aussi coller votre carte entière depuis la mise en service."
             action={
               writable ? (
-                <Button variant="primary" onClick={() => setCategoryModal('new')}>
+                <Button variant="primary" onClick={() => setEditingCategory('new')}>
                   Créer une catégorie
                 </Button>
               ) : null
             }
           />
-        ) : null}
-
-        <div className="grid gap-5">
-          {(categories.data ?? []).map((category) => {
-            const list = byCategory.get(category.id) ?? [];
-            if (filter === 'sold_out' && list.length === 0) return null;
-
-            return (
-              <section
+        ) : (
+          <div className="cat-grid">
+            {allCategories.map((category) => (
+              <CategoryCard
                 key={category.id}
-                className="evx-card"
-                aria-label={resolveI18n(category.name)}
-              >
-                <header className="evx-card__head">
-                  <div className="flex items-center gap-3">
-                    {category.icon ? <span className="text-lg">{category.icon}</span> : null}
-                    <div>
-                      <h2 className="evx-card__title">{resolveI18n(category.name)}</h2>
-                      <p className="evx-card__desc">
-                        {list.length} plat{list.length > 1 ? 's' : ''}
-                        {category.isVisible ? '' : ' · masquée du menu'}
-                      </p>
-                    </div>
-                  </div>
-                  {writable ? (
-                    <div className="evx-card__actions">
-                      <Button size="sm" variant="ghost" onClick={() => setCategoryModal(category)}>
-                        Modifier
-                      </Button>
-                    </div>
-                  ) : null}
-                </header>
-
-                <div>
-                  {list.length === 0 ? (
-                    <p className="px-4 py-6 text-[13px]" style={{ color: 'var(--ink-3)' }}>
-                      Aucun plat dans cette catégorie.
-                    </p>
-                  ) : (
-                    list.map((item) => (
-                      <div key={item.id} className="row">
-                        <div
-                          className="w-11 h-11 rounded-[9px] shrink-0 overflow-hidden"
-                          style={{ background: 'var(--paper)', border: '1px solid var(--rule)' }}
-                        >
-                          {item.images[0] ? (
-                            <img
-                              src={mediaUrl(item.images[0].variants.thumb)!}
-                              alt=""
-                              className="w-full h-full object-cover"
-                              width={44}
-                              height={44}
-                            />
-                          ) : null}
-                        </div>
-
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold truncate m-0">{resolveI18n(item.name)}</p>
-                          <p
-                            className="text-[12px] truncate m-0"
-                            style={{ color: 'var(--ink-3)' }}
-                          >
-                            {resolveI18n(item.description) || '—'}
-                          </p>
-                        </div>
-
-                        {item.status === 'SOLD_OUT' ? <Badge tone="danger">Épuisé</Badge> : null}
-                        {item.status === 'DISABLED' ? <Badge tone="neutral">Retiré</Badge> : null}
-
-                        <span className="tabular-nums font-semibold shrink-0 w-24 text-right">
-                          {item.basePrice !== null
-                            ? `${formatAmount(item.basePrice)} F`
-                            : `dès ${formatAmount(Math.min(...item.variants.map((v) => v.price)))} F`}
-                        </span>
-
-                        <div className="flex gap-2 shrink-0">
-                          <Button
-                            size="sm"
-                            variant={item.status === 'SOLD_OUT' ? 'primary' : 'secondary'}
-                            loading={setStatus.isPending && setStatus.variables?.id === item.id}
-                            onClick={() =>
-                              setStatus.mutate({
-                                id: item.id,
-                                status: item.status === 'SOLD_OUT' ? 'AVAILABLE' : 'SOLD_OUT',
-                              })
-                            }
-                          >
-                            {item.status === 'SOLD_OUT' ? 'Remettre' : 'Épuisé'}
-                          </Button>
-
-                          {writable ? (
-                            <Button size="sm" variant="ghost" onClick={() => setEditing(item)}>
-                              Modifier
-                            </Button>
-                          ) : null}
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </section>
-            );
-          })}
-        </div>
-      </div>
-
-      {editing ? (
-        <ItemModal
-          item={editing === 'new' ? null : editing}
-          categories={categories.data ?? []}
-          onClose={() => setEditing(null)}
-          onSaved={async () => {
-            setEditing(null);
-            await invalidate();
-          }}
-          onArchive={
-            editing !== 'new'
-              ? () => {
-                  archive.mutate(editing.id);
-                  setEditing(null);
+                category={category}
+                items={itemsByCategory.get(category.id) ?? []}
+                editable={writable}
+                dragging={dragId === category.id}
+                onOpen={() => setOpenCategoryId(category.id)}
+                onEdit={() => setEditingCategory(category)}
+                dragHandlers={
+                  writable
+                    ? {
+                        draggable: true,
+                        onDragStart: () => setDragId(category.id),
+                        onDragOver: (event) => event.preventDefault(),
+                        onDrop: () => {
+                          if (!dragId || dragId === category.id) return;
+                          const ids = allCategories.map((entry) => entry.id);
+                          const from = ids.indexOf(dragId);
+                          const to = ids.indexOf(category.id);
+                          const next = [...ids];
+                          const [moved] = next.splice(from, 1);
+                          next.splice(to, 0, moved!);
+                          reorderCategories.mutate(next);
+                        },
+                        onDragEnd: () => setDragId(null),
+                      }
+                    : undefined
                 }
-              : undefined
-          }
-        />
-      ) : null}
-
-      {categoryModal ? (
-        <CategoryModal
-          category={categoryModal === 'new' ? null : categoryModal}
-          onClose={() => setCategoryModal(null)}
-          onSaved={async () => {
-            setCategoryModal(null);
-            await invalidate();
-          }}
-        />
-      ) : null}
-    </>
-  );
-}
-
-/* ── Fenêtre d'édition d'un plat ────────────────────────────────────────── */
-
-function ItemModal({
-  item,
-  categories,
-  onClose,
-  onSaved,
-  onArchive,
-}: {
-  item: ItemRow | null;
-  categories: CategoryRow[];
-  onClose: () => void;
-  onSaved: () => Promise<void>;
-  onArchive?: () => void;
-}): JSX.Element {
-  const toast = useToast();
-  const [name, setName] = useState(resolveI18n(item?.name ?? null));
-  const [description, setDescription] = useState(resolveI18n(item?.description ?? null));
-  const [categoryId, setCategoryId] = useState(item?.categoryId ?? categories[0]?.id ?? '');
-  const [priceMode, setPriceMode] = useState<'simple' | 'variants'>(
-    item && item.variants.length > 0 ? 'variants' : 'simple',
-  );
-  const [basePrice, setBasePrice] = useState(String(item?.basePrice ?? ''));
-  const [variants, setVariants] = useState(
-    item?.variants.map((v) => ({ name: resolveI18n(v.name), price: String(v.price) })) ?? [
-      { name: 'Petit', price: '' },
-      { name: 'Grand', price: '' },
-    ],
-  );
-  const [prepMinutes, setPrepMinutes] = useState(String(item?.prepMinutes ?? ''));
-  const [allergens, setAllergens] = useState<string[]>(item?.allergens ?? []);
-  const [error, setError] = useState<string | null>(null);
-
-  const save = useMutation({
-    mutationFn: (payload: Record<string, unknown>) =>
-      item ? api.patch(`/menu-items/${item.id}`, payload) : api.post('/menu-items', payload),
-    onSuccess: async () => {
-      toast.success(item ? 'Plat mis à jour.' : 'Plat créé.');
-      await onSaved();
-    },
-    onError: (cause) => {
-      setError(cause instanceof ApiRequestError ? cause.message : 'Enregistrement impossible.');
-    },
-  });
-
-  const submit = (): void => {
-    setError(null);
-
-    const payload: Record<string, unknown> = {
-      categoryId,
-      name: { fr: name.trim() },
-      description: description.trim() ? { fr: description.trim() } : {},
-      prepMinutes: prepMinutes ? Number(prepMinutes) : null,
-      allergens,
-    };
-
-    if (priceMode === 'simple') {
-      payload.basePrice = Number(basePrice);
-      payload.variants = [];
-    } else {
-      const cleaned = variants
-        .filter((variant) => variant.name.trim() && variant.price)
-        .map((variant) => ({ name: { fr: variant.name.trim() }, price: Number(variant.price) }));
-      if (cleaned.length === 0) {
-        setError('Ajoutez au moins une variante, ou passez en prix unique.');
-        return;
-      }
-      payload.basePrice = null;
-      payload.variants = cleaned;
-    }
-
-    save.mutate(payload);
-  };
-
-  return (
-    <Modal
-      open
-      onClose={onClose}
-      title={item ? resolveI18n(item.name) : 'Nouveau plat'}
-      description={item ? 'Les changements de prix sont journalisés.' : undefined}
-      width={560}
-      footer={
-        <>
-          {onArchive ? (
-            <Button variant="danger" size="sm" onClick={onArchive} className="mr-auto">
-              Archiver
-            </Button>
-          ) : null}
-          <Button onClick={onClose}>Annuler</Button>
-          <Button variant="primary" loading={save.isPending} onClick={submit}>
-            Enregistrer
-          </Button>
-        </>
-      }
-    >
-      <Field label="Nom du plat" required>
-        {(id) => (
-          <Input id={id} value={name} onChange={(event) => setName(event.target.value)} autoFocus />
-        )}
-      </Field>
-
-      <Field label="Description">
-        {(id) => (
-          <Textarea
-            id={id}
-            rows={2}
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-            placeholder="Ce que vous diriez au client en le servant."
-          />
-        )}
-      </Field>
-
-      <Field label="Catégorie" required>
-        {(id) => (
-          <Select id={id} value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
-            {categories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {resolveI18n(category.name)}
-              </option>
+              />
             ))}
-          </Select>
-        )}
-      </Field>
 
-      <Field
-        label="Prix"
-        hint="Un prix unique, ou des variantes (petit, moyen, grand) — mais pas les deux."
-      >
-        {() => (
-          <>
-            <div className="flex gap-2 mb-3">
-              <button
-                type="button"
-                className={`evx-btn evx-btn--sm ${priceMode === 'simple' ? 'evx-btn--secondary' : 'evx-btn--ghost'}`}
-                onClick={() => setPriceMode('simple')}
-              >
-                Prix unique
+            {writable ? (
+              <button type="button" className="cat-card cat-card--add" onClick={() => setEditingCategory('new')}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+                Nouvelle catégorie
               </button>
-              <button
-                type="button"
-                className={`evx-btn evx-btn--sm ${priceMode === 'variants' ? 'evx-btn--secondary' : 'evx-btn--ghost'}`}
-                onClick={() => setPriceMode('variants')}
-              >
-                Plusieurs tailles
-              </button>
-            </div>
-
-            {priceMode === 'simple' ? (
-              <div className="flex items-center gap-2">
-                <Input
-                  type="number"
-                  min={0}
-                  inputMode="numeric"
-                  value={basePrice}
-                  onChange={(event) => setBasePrice(event.target.value)}
-                  className="!w-40"
-                  aria-label="Prix en francs"
-                />
-                <span style={{ color: 'var(--ink-3)' }}>FCFA</span>
-              </div>
-            ) : (
-              <div className="grid gap-2">
-                {variants.map((variant, index) => (
-                  <div key={index} className="flex items-center gap-2">
-                    <Input
-                      value={variant.name}
-                      placeholder="Taille"
-                      onChange={(event) =>
-                        setVariants((current) =>
-                          current.map((row, i) =>
-                            i === index ? { ...row, name: event.target.value } : row,
-                          ),
-                        )
-                      }
-                      aria-label={`Nom de la variante ${index + 1}`}
-                    />
-                    <Input
-                      type="number"
-                      min={0}
-                      inputMode="numeric"
-                      value={variant.price}
-                      placeholder="Prix"
-                      className="!w-32"
-                      onChange={(event) =>
-                        setVariants((current) =>
-                          current.map((row, i) =>
-                            i === index ? { ...row, price: event.target.value } : row,
-                          ),
-                        )
-                      }
-                      aria-label={`Prix de la variante ${index + 1}`}
-                    />
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setVariants((current) => current.filter((_, i) => i !== index))}
-                      aria-label="Retirer cette variante"
-                    >
-                      ×
-                    </Button>
-                  </div>
-                ))}
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setVariants((current) => [...current, { name: '', price: '' }])}
-                >
-                  Ajouter une taille
-                </Button>
-              </div>
-            )}
-          </>
-        )}
-      </Field>
-
-      <Field label="Temps de préparation" hint="En minutes. Laissez vide si cela n’a pas de sens.">
-        {(id) => (
-          <Input
-            id={id}
-            type="number"
-            min={0}
-            max={600}
-            className="!w-32"
-            value={prepMinutes}
-            onChange={(event) => setPrepMinutes(event.target.value)}
-          />
-        )}
-      </Field>
-
-      <Field label="Allergènes">
-        {() => (
-          <div className="flex flex-wrap gap-2">
-            {COMMON_ALLERGENS.map((allergen) => {
-              const active = allergens.includes(allergen);
-              return (
-                <button
-                  key={allergen}
-                  type="button"
-                  className={`evx-btn evx-btn--sm ${active ? 'evx-btn--secondary' : 'evx-btn--ghost'}`}
-                  aria-pressed={active}
-                  onClick={() =>
-                    setAllergens((current) =>
-                      active ? current.filter((a) => a !== allergen) : [...current, allergen],
-                    )
-                  }
-                >
-                  {allergen}
-                </button>
-              );
-            })}
+            ) : null}
           </div>
         )}
-      </Field>
+      </div>
 
-      {error ? (
-        <p
-          className="mt-4 p-3 rounded-[10px] text-[13px]"
-          role="alert"
-          style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}
-        >
-          {error}
-        </p>
-      ) : null}
-    </Modal>
+      {renderDrawers()}
+    </>
   );
+
+  /* ── Fonctions locales ──────────────────────────────────────────────────── */
+
+  /**
+   * Cliquer sur « Épuisés » ou « Sans photo » ouvre la liste correspondante, toutes catégories
+   * confondues : ce sont des questions transversales, pas des questions de rangement.
+   */
+  function openFiltered(next: Filter): void {
+    setFilter(next);
+    setOpenCategoryId(ALL_CATEGORIES);
+  }
+
+  function renderDrawers(): JSX.Element {
+    return (
+      <>
+        {editingItem ? (
+          <ItemDrawer
+            item={editingItem === 'new' ? null : editingItem}
+            categories={allCategories}
+            defaultCategoryId={openCategoryId ?? undefined}
+            onClose={() => setEditingItem(null)}
+            onSaved={async () => {
+              setEditingItem(null);
+              await invalidate();
+            }}
+          />
+        ) : null}
+
+        {editingCategory ? (
+          <CategoryDrawer
+            category={editingCategory === 'new' ? null : editingCategory}
+            onClose={() => setEditingCategory(null)}
+            onSaved={async () => {
+              setEditingCategory(null);
+              await invalidate();
+            }}
+          />
+        ) : null}
+      </>
+    );
+  }
 }
 
-/* ── Fenêtre d'édition d'une catégorie ──────────────────────────────────── */
+/* ── Utilitaires ──────────────────────────────────────────────────────────── */
 
-function CategoryModal({
-  category,
-  onClose,
-  onSaved,
-}: {
-  category: CategoryRow | null;
-  onClose: () => void;
-  onSaved: () => Promise<void>;
-}): JSX.Element {
-  const toast = useToast();
-  const [name, setName] = useState(resolveI18n(category?.name ?? null));
-  const [icon, setIcon] = useState(category?.icon ?? '');
-  const [isVisible, setIsVisible] = useState(category?.isVisible ?? true);
-  const [error, setError] = useState<string | null>(null);
+function filterTitle(filter: Filter, searching: boolean): string {
+  if (searching) return 'Recherche';
+  if (filter === 'sold_out') return 'Plats épuisés';
+  if (filter === 'no_photo') return 'Plats sans photo';
+  return 'Toute la carte';
+}
 
-  const save = useMutation({
-    mutationFn: () => {
-      const payload = { name: { fr: name.trim() }, icon: icon || null, isVisible };
-      return category
-        ? api.patch(`/categories/${category.id}`, payload)
-        : api.post('/categories', payload);
-    },
-    onSuccess: async () => {
-      toast.success(category ? 'Catégorie mise à jour.' : 'Catégorie créée.');
-      await onSaved();
-    },
-    onError: (cause) =>
-      setError(cause instanceof ApiRequestError ? cause.message : 'Enregistrement impossible.'),
-  });
+function matches(item: ItemRow, query: string): boolean {
+  const needle = normalise(query);
+  if (!needle) return true;
+  return normalise(`${resolveI18n(item.name)} ${resolveI18n(item.description)}`).includes(needle);
+}
 
-  const remove = useMutation({
-    mutationFn: () => api.delete(`/categories/${category!.id}`),
-    onSuccess: async () => {
-      toast.success('Catégorie archivée.');
-      await onSaved();
-    },
-    onError: (cause) =>
-      setError(cause instanceof ApiRequestError ? cause.message : 'Archivage impossible.'),
-  });
+const normalise = (value: string): string =>
+  value
+    .toLocaleLowerCase('fr')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
 
-  return (
-    <Modal
-      open
-      onClose={onClose}
-      title={category ? resolveI18n(category.name) : 'Nouvelle catégorie'}
-      footer={
-        <>
-          {category ? (
-            <Button
-              variant="danger"
-              size="sm"
-              className="mr-auto"
-              loading={remove.isPending}
-              onClick={() => remove.mutate()}
-            >
-              Archiver
-            </Button>
-          ) : null}
-          <Button onClick={onClose}>Annuler</Button>
-          <Button variant="primary" loading={save.isPending} onClick={() => save.mutate()}>
-            Enregistrer
-          </Button>
-        </>
-      }
-    >
-      <Field label="Nom" required>
-        {(id) => (
-          <Input
-            id={id}
-            autoFocus
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            placeholder="Grillades"
-          />
-        )}
-      </Field>
+function readDensity(): Density {
+  try {
+    return localStorage.getItem(DENSITY_KEY) === 'list' ? 'list' : 'grid';
+  } catch {
+    return 'grid';
+  }
+}
 
-      <Field label="Icône" hint="Un emoji, pour repérer la catégorie d’un coup d’œil.">
-        {(id) => (
-          <Input
-            id={id}
-            maxLength={4}
-            className="!w-24 text-center text-xl"
-            value={icon}
-            onChange={(event) => setIcon(event.target.value)}
-            placeholder="🔥"
-          />
-        )}
-      </Field>
-
-      <Field label="Visible sur le menu">
-        {() => (
-          <label className="flex items-center gap-3 text-[13.5px]">
-            <input
-              type="checkbox"
-              checked={isVisible}
-              onChange={(event) => setIsVisible(event.target.checked)}
-              style={{ accentColor: 'var(--accent)', width: 18, height: 18 }}
-            />
-            Les clients voient cette catégorie
-          </label>
-        )}
-      </Field>
-
-      {error ? (
-        <p
-          className="mt-4 p-3 rounded-[10px] text-[13px]"
-          role="alert"
-          style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}
-        >
-          {error}
-        </p>
-      ) : null}
-    </Modal>
-  );
+function writeDensity(density: Density): void {
+  try {
+    localStorage.setItem(DENSITY_KEY, density);
+  } catch {
+    /* stockage refusé : le réglage vaudra pour la session */
+  }
 }

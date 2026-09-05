@@ -28,21 +28,21 @@ test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true
 
 test('le gérant marque un plat épuisé en un geste, depuis son téléphone', async ({ page }) => {
   await connect(page, MANAGER);
-  await page.goto('/carte');
+  await ouvrirCategorie(page, 'Pizzas');
 
-  const ligne = page.locator('.row', { hasText: 'Margherita' }).first();
-  await expect(ligne).toBeVisible();
+  const carte = page.locator('.dish-card', { hasText: 'Margherita' }).first();
+  await expect(carte).toBeVisible();
 
   // La recette doit être rejouable : on repart d'un plat disponible.
-  const remettre = ligne.getByRole('button', { name: 'Remettre' });
+  const remettre = carte.getByRole('button', { name: 'Remettre' });
   if (await remettre.isVisible()) {
     await remettre.click();
-    await expect(ligne.getByRole('button', { name: 'Épuisé' })).toBeVisible();
+    await expect(carte.getByRole('button', { name: 'Épuisé' })).toBeVisible();
   }
 
-  await ligne.getByRole('button', { name: 'Épuisé' }).click();
+  await carte.getByRole('button', { name: 'Épuisé' }).click();
   await expect(page.getByText('Plat marqué épuisé.')).toBeVisible();
-  await expect(ligne.getByRole('button', { name: 'Remettre' })).toBeVisible();
+  await expect(carte.getByRole('button', { name: 'Remettre' })).toBeVisible();
 });
 
 test('le menu client reflète le changement en moins de 60 secondes', async ({ page }) => {
@@ -57,9 +57,13 @@ test('le menu client reflète le changement en moins de 60 secondes', async ({ p
 
 test('un changement de prix est journalisé', async ({ page }) => {
   await connect(page, ADMIN);
-  await page.goto('/carte');
+  await ouvrirCategorie(page, 'Desserts');
 
-  await page.locator('.row', { hasText: 'Tiramisu' }).first().getByRole('button', { name: 'Modifier' }).click();
+  await page
+    .locator('.dish-card', { hasText: 'Tiramisu' })
+    .first()
+    .getByRole('button', { name: 'Modifier', exact: true })
+    .click();
   await expect(page.getByRole('dialog')).toBeVisible();
 
   await page.getByLabel('Prix en francs').fill('3200');
@@ -166,18 +170,28 @@ test('le menu reste consultable hors ligne après une première visite', async (
 
 test('un serveur peut marquer un plat épuisé, mais pas toucher aux prix', async ({ page }) => {
   await connect(page, 'gerant@casalina.cm');
-  await page.goto('/carte');
+  await ouvrirCategorie(page, 'Pizzas');
 
   // Le gérant a bien les deux droits ; on vérifie ici que l'écran les expose.
-  const ligne = page.locator('.row').first();
-  await expect(ligne.getByRole('button', { name: /Épuisé|Remettre/ })).toBeVisible();
-  await expect(ligne.getByRole('button', { name: 'Modifier' })).toBeVisible();
+  const carte = page.locator('.dish-card').first();
+  await expect(carte.getByRole('button', { name: /Épuisé|Remettre/ })).toBeVisible();
+  await expect(carte.getByRole('button', { name: 'Modifier', exact: true })).toBeVisible();
 
   // La charte, elle, reste hors de portée d'un gérant.
   await expect(page.getByRole('link', { name: 'Identité et charte' })).toHaveCount(0);
 });
 
 /* ── Utilitaires ────────────────────────────────────────────────────────── */
+
+/**
+ * Entre dans une catégorie depuis la vue des cartes.
+ * Le back-office n'affiche jamais toute la carte d'un coup : on choisit d'abord un rayon.
+ */
+async function ouvrirCategorie(page: Page, nom: string): Promise<void> {
+  await page.goto('/carte');
+  await page.locator('.cat-card', { hasText: nom }).first().click();
+  await expect(page.locator('.dish-card, .row').first()).toBeVisible();
+}
 
 async function connect(page: Page, email: string): Promise<void> {
   await page.goto('/connexion');

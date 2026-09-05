@@ -1,6 +1,17 @@
 import { useState, type JSX } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Badge, Button, EmptyState, Field, Input, Modal, Select, Spin, useToast } from '@evolyx/ui';
+import {
+  ArtTableTent,
+  Badge,
+  Button,
+  EmptyState,
+  Field,
+  Input,
+  Modal,
+  Select,
+  Spin,
+  useToast,
+} from '@evolyx/ui';
 import type { AccessPointSummary } from '@evolyx/shared';
 import { API_URL, ApiRequestError, api, getAccessToken } from '../lib/api';
 import { useSession } from '../lib/session';
@@ -80,6 +91,7 @@ export function AccessPointsPage(): JSX.Element {
       <div className="page">
         {list.length === 0 ? (
           <EmptyState
+            art={<ArtTableTent />}
             title="Aucun code pour l’instant"
             description="Créez un code par table. Chaque code est définitif : il reste valable même si vous renommez la table ou changez de charte."
             action={

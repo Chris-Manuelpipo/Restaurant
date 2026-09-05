@@ -130,6 +130,11 @@ test('les cinq étapes se traversent, l’aperçu suivant chaque frappe', async 
   /* — Publication ——————————————————————————————————————— */
   await page.getByRole('button', { name: /Publier mon menu/ }).click();
   await expect(page).toHaveURL(/\/carte/);
+
+  // La carte s'ouvre sur ses catégories : les plats importés sont rangés dans « Grillades ».
+  const grillades = page.locator('.cat-card', { hasText: 'Grillades' }).first();
+  await expect(grillades).toBeVisible();
+  await grillades.click();
   await expect(page.getByText('Poulet braisé entier')).toBeVisible();
 });
 

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import type { PublicCategory } from '@evolyx/shared';
+import { CategoryMark } from './CategoryMark';
 
 /**
  * Barre de catégories collante.
@@ -59,6 +60,7 @@ export function CategoryNav({
             aria-current={category.id === active}
             onClick={() => onSelect(category.id)}
           >
+            <CategoryMark icon={category.icon} imageUrl={category.imageUrl} size={15} />
             {category.name}
             <span className="count">{category.items.length}</span>
           </button>

@@ -255,6 +255,9 @@ a[role='button'] {
   .nav-scroll::-webkit-scrollbar { display: none; }
 
   .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     flex: none;
     scroll-snap-align: start;
     padding: 8px 15px;
@@ -323,6 +326,25 @@ a[role='button'] {
     place-items: center;
   }
   .thumb img { width: 100%; height: 100%; object-fit: cover; }
+
+  /* ── Vignette dessinée, quand le plat n'a pas de photo ──────────────────
+     Le glyphe doit se lire comme une intention, pas comme une image ratée : un halo
+     très léger de la couleur du restaurant, un trait sourd, et le dessin qui respire
+     à 58 % de la vignette. À côté d'une vraie photo, il reste second — c'est voulu. */
+  .thumb:has(.dish-glyph) {
+    background:
+      radial-gradient(circle at 50% 42%, color-mix(in oklab, var(--primary) 13%, transparent), transparent 68%),
+      var(--tile);
+  }
+  .dish-glyph {
+    width: 58%;
+    height: 58%;
+    stroke-width: 1.7;
+    color: var(--muted);
+    opacity: 0.9;
+  }
+  /* Sur charte claire, un trait sourd disparaît : on le rapproche du texte. */
+  body[data-light='true'] .dish-glyph { color: var(--text); opacity: 0.5; }
 
   .price {
     flex: none;
@@ -421,6 +443,47 @@ a[role='button'] {
     overscroll-behavior: contain;
   }
   .sheet[data-open='true'] { transform: translate(-50%, 0); }
+
+  /* Galerie de la fiche : défilement à accroche, une photo par écran. */
+  .sheet-gallery {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+  }
+  .sheet-gallery::-webkit-scrollbar { display: none; }
+  .sheet-gallery picture {
+    flex: 0 0 100%;
+    scroll-snap-align: center;
+    display: block;
+    height: 100%;
+  }
+  .sheet-gallery img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+  .sheet-dots {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 9px;
+    display: flex;
+    justify-content: center;
+    gap: 5px;
+  }
+  .sheet-dots span {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: color-mix(in oklab, var(--text) 45%, transparent);
+    transition: width 0.2s var(--ease), background 0.2s var(--ease);
+  }
+  .sheet-dots span[data-active] {
+    width: 16px;
+    border-radius: 99px;
+    background: var(--text);
+  }
 
   .grip {
     width: 38px;

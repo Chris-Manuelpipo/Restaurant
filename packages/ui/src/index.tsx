@@ -23,6 +23,8 @@ import {
    taille de cible tactile avant la sophistication.
    ═══════════════════════════════════════════════════════════════════════════ */
 
+export * from './illustrations';
+
 const cx = (...parts: (string | false | null | undefined)[]): string =>
   parts.filter(Boolean).join(' ');
 
@@ -187,20 +189,29 @@ export function Badge({
   return <span className={cx('evx-badge', `evx-badge--${tone}`)}>{children}</span>;
 }
 
+/**
+ * `icon` et `art` disent la même chose à deux volumes différents : `icon` est la pastille de
+ * 52 px, `art` une illustration au trait de 150 px. Un écran vide qu'on croise souvent garde
+ * la pastille ; un écran vide qui *demande une action* mérite le dessin. Quand les deux sont
+ * passés, l'illustration gagne — c'est la plus explicite.
+ */
 export function EmptyState({
   title,
   description,
   action,
   icon,
+  art,
 }: {
   title: string;
   description?: string;
   action?: ReactNode;
   icon?: ReactNode;
+  art?: ReactNode;
 }): JSX.Element {
   return (
     <div className="evx-empty">
-      {icon ? <div className="evx-empty__icon">{icon}</div> : null}
+      {art ? <div className="evx-empty__art">{art}</div> : null}
+      {!art && icon ? <div className="evx-empty__icon">{icon}</div> : null}
       <h3 className="evx-empty__title">{title}</h3>
       {description ? <p className="evx-empty__desc">{description}</p> : null}
       {action ? <div className="evx-empty__action">{action}</div> : null}
@@ -341,3 +352,8 @@ export function Spin({ label = 'Chargement…' }: { label?: string }): JSX.Eleme
 }
 
 export { cx };
+
+/* ── Composants livrés dans des fichiers séparés ────────────────────────── */
+export { CategoryGlyph, VisualGlyph } from './glyph.js';
+export { SegmentedControl, SearchInput, Drawer, Breadcrumb } from './controls.js';
+export { StatCard, StatRow, type StatTone } from './stat-card.js';

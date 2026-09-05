@@ -5,6 +5,8 @@ export * from './i18n.js';
 export * from './time.js';
 export * from './money.js';
 export * from './types.js';
+export * from './icons.js';
+export * from './visual.js';
 
 export * from './schemas/common.js';
 export * from './schemas/auth.js';

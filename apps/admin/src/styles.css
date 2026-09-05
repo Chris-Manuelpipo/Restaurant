@@ -17,9 +17,44 @@
     display: grid;
     grid-template-columns: 250px minmax(0, 1fr);
     min-height: 100dvh;
+    transition: grid-template-columns 0.22s var(--ease);
   }
+  /* Rail replié : les icônes seules, le titre revient en infobulle. */
+  .app-shell[data-collapsed] { grid-template-columns: 68px minmax(0, 1fr); }
+  .app-shell[data-collapsed] .rail-label { display: none; }
+  .app-shell[data-collapsed] .rail { padding: 22px 12px; align-items: center; }
+  .app-shell[data-collapsed] .brand { justify-content: center; margin-bottom: 22px; }
+  .app-shell[data-collapsed] .nav-link { justify-content: center; padding: 10px; }
+  .app-shell[data-collapsed] .nav-kicker { display: none; }
+  .app-shell[data-collapsed] .rail-toggle { position: absolute; top: 68px; right: 12px; }
+  .app-shell[data-collapsed] .rail-foot .evx-btn { padding: 8px; }
+
   @media (max-width: 860px) {
-    .app-shell { grid-template-columns: 1fr; }
+    .app-shell,
+    .app-shell[data-collapsed] { grid-template-columns: 1fr; }
+    .app-shell[data-collapsed] .rail-label { display: revert; }
+  }
+
+  .rail-toggle {
+    margin-left: auto;
+    width: 30px;
+    height: 30px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--ink-3);
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    flex: none;
+    transition: background 0.16s var(--ease), color 0.16s var(--ease);
+  }
+  .rail-toggle:hover { background: var(--paper); color: var(--ink); }
+
+  .rail-foot {
+    margin-top: auto;
+    padding-top: 16px;
+    border-top: 1px solid var(--rule-2);
   }
 
   .rail {
@@ -31,6 +66,7 @@
     position: sticky;
     top: 0;
     height: 100dvh;
+    overflow: visible;
   }
   @media (max-width: 860px) {
     .rail {
@@ -352,6 +388,467 @@
     font-variant-numeric: tabular-nums;
     font-size: 11px;
   }
+
+  .evx-crumb > span { display: inline-flex; align-items: center; gap: 6px; }
+
+  /* ── La carte : barre d'outils ────────────────────────────────────────── */
+  .menu-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-bottom: 18px;
+  }
+
+  /* ── La carte : grille de catégories ──────────────────────────────────── */
+  .cat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(248px, 1fr));
+    gap: 14px;
+    margin-top: 22px;
+  }
+
+  .cat-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 16px;
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    transition: border-color 0.18s var(--ease), transform 0.18s var(--ease), box-shadow 0.18s var(--ease);
+  }
+  .cat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); border-color: var(--ink-3); }
+  .cat-card:hover .cat-card__arrow { transform: translateX(3px); color: var(--accent); }
+  .cat-card[data-hidden] { background: #fbfaf7; border-style: dashed; }
+  .cat-card[data-dragging] { opacity: 0.4; }
+
+  /* La surface cliquable couvre la carte, sous les boutons — un seul geste pour entrer. */
+  .cat-card__open {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    border: 0;
+    background: transparent;
+    border-radius: var(--radius);
+    cursor: pointer;
+  }
+  .cat-card__head,
+  .cat-card__foot { position: relative; z-index: 1; pointer-events: none; }
+  .cat-card__head { display: flex; align-items: center; gap: 13px; }
+  .cat-card__edit,
+  .cat-card__grip { pointer-events: auto; }
+
+  .cat-card__name {
+    font-family: var(--font-display);
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.25;
+    margin: 0;
+    /* Deux lignes : « Boissons fraîches » ne doit pas devenir « Boissons fraîc… ». */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .cat-card__count { margin: 2px 0 0; font-size: 12.5px; color: var(--ink-3); }
+
+  .cat-card__edit {
+    width: 30px;
+    height: 30px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--ink-3);
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    flex: none;
+    opacity: 0;
+    transition: opacity 0.16s var(--ease), background 0.16s var(--ease);
+  }
+  .cat-card:hover .cat-card__edit,
+  .cat-card__edit:focus-visible { opacity: 1; }
+  .cat-card__edit:hover { background: var(--paper); color: var(--ink); }
+
+  .cat-card__foot {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    min-height: 24px;
+  }
+  .cat-card__arrow {
+    margin-left: auto;
+    color: var(--ink-3);
+    display: grid;
+    place-items: center;
+    transition: transform 0.18s var(--ease), color 0.18s var(--ease);
+  }
+
+  .cat-card__grip {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: var(--ink-3);
+    opacity: 0;
+    cursor: grab;
+    transition: opacity 0.16s var(--ease);
+  }
+  .cat-card:hover .cat-card__grip { opacity: 0.6; }
+
+  .cat-card--add {
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    border-style: dashed;
+    background: transparent;
+    color: var(--ink-3);
+    font-size: 13.5px;
+    font-weight: 500;
+    cursor: pointer;
+    min-height: 132px;
+  }
+  .cat-card--add:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+
+  /* ── La carte : bande de catégories ───────────────────────────────────── */
+  .cat-strip {
+    display: flex;
+    gap: 7px;
+    overflow-x: auto;
+    padding-bottom: 10px;
+    margin-bottom: 16px;
+    scrollbar-width: thin;
+  }
+  .cat-strip button {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 13px;
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    background: var(--card);
+    color: var(--ink-2);
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+    flex: none;
+    transition: all 0.16s var(--ease);
+  }
+  .cat-strip button:hover { border-color: var(--ink-3); color: var(--ink); }
+  .cat-strip button[aria-current='true'] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    font-weight: 600;
+  }
+  .cat-strip__count {
+    font-size: 11.5px;
+    opacity: 0.65;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── La carte : grille de plats ───────────────────────────────────────── */
+  .dish-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(212px, 1fr));
+    gap: 14px;
+  }
+
+  .dish-card {
+    display: flex;
+    flex-direction: column;
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    overflow: hidden;
+    transition: border-color 0.18s var(--ease), transform 0.18s var(--ease), box-shadow 0.18s var(--ease);
+  }
+  .dish-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+  .dish-card[data-sold] { background: #fbfaf7; }
+  .dish-card[data-sold] .dish-card__photo img { filter: grayscale(1); opacity: 0.55; }
+
+  .dish-card__photo {
+    position: relative;
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    border: 0;
+    padding: 0;
+    background: var(--paper);
+    cursor: pointer;
+    overflow: hidden;
+  }
+  .dish-card__photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .dish-card__nophoto {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 6px;
+    color: var(--ink-3);
+    font-size: 11.5px;
+  }
+  .dish-card__count {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: rgb(26 25 23 / 0.62);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    display: grid;
+    place-items: center;
+    backdrop-filter: blur(4px);
+  }
+  .dish-card__ribbon {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    padding: 4px 10px;
+    background: var(--danger);
+    color: #fff;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    border-radius: 0 8px 0 0;
+  }
+
+  .dish-card__body { padding: 12px 13px 13px; display: flex; flex-direction: column; gap: 4px; flex: 1; }
+  .dish-card__name {
+    margin: 0;
+    font-size: 13.5px;
+    font-weight: 600;
+    line-height: 1.3;
+    letter-spacing: -0.005em;
+  }
+  .dish-card__price {
+    font-size: 13.5px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    flex: none;
+  }
+  .dish-card__price em { font-style: normal; font-size: 10.5px; font-weight: 500; color: var(--ink-3); }
+  .dish-card__meta {
+    margin: 0;
+    font-size: 12px;
+    color: var(--ink-3);
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .dish-card__actions { display: flex; gap: 7px; margin-top: auto; padding-top: 10px; }
+  .dish-card__actions .evx-btn { flex: 1; }
+
+  .dish-row__thumb {
+    width: 44px;
+    height: 44px;
+    border-radius: 9px;
+    border: 1px solid var(--rule);
+    background: var(--paper);
+    overflow: hidden;
+    flex: none;
+    display: grid;
+    place-items: center;
+    color: var(--ink-3);
+    cursor: pointer;
+    padding: 0;
+  }
+  .dish-row__thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .row[data-sold] { background: #fbfaf7; }
+  .row[data-sold] .dish-row__thumb img { filter: grayscale(1); opacity: 0.55; }
+
+  /* ── Galerie de photos ────────────────────────────────────────────────── */
+  .gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+    gap: 9px;
+  }
+  .gallery__item {
+    position: relative;
+    margin: 0;
+    aspect-ratio: 4 / 3;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--rule);
+    cursor: grab;
+  }
+  .gallery__item[data-main] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+  .gallery__item[data-dragging] { opacity: 0.4; }
+  .gallery__item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .gallery__item figcaption {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    padding: 3px 7px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    text-align: center;
+  }
+  .gallery__actions {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 0.16s var(--ease);
+  }
+  .gallery__item:hover .gallery__actions { opacity: 1; }
+  .gallery__actions button {
+    width: 24px;
+    height: 24px;
+    border: 0;
+    border-radius: 7px;
+    background: rgb(26 25 23 / 0.66);
+    color: #fff;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    backdrop-filter: blur(4px);
+  }
+  .gallery__actions button:hover { background: var(--ink); }
+
+  .gallery__add,
+  .gallery__pending {
+    aspect-ratio: 4 / 3;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 6px;
+    border: 1px dashed var(--rule);
+    border-radius: 10px;
+    background: var(--paper);
+    color: var(--ink-3);
+    font-size: 11.5px;
+    cursor: pointer;
+    padding: 8px;
+    text-align: center;
+  }
+  .gallery__add:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+  .gallery__add:disabled { cursor: wait; }
+  .gallery__pending { grid-column: 1 / -1; cursor: default; }
+
+  /* ── Sélecteur de visuel ──────────────────────────────────────────────── */
+  .visual-picker { display: flex; flex-direction: column; }
+
+  .visual-picker__preview {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px;
+    border-radius: var(--radius);
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    margin-bottom: 14px;
+  }
+
+  .visual-picker__tabs {
+    display: inline-flex;
+    gap: 2px;
+    padding: 3px;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    margin-bottom: 12px;
+    align-self: flex-start;
+  }
+  .visual-picker__tabs button {
+    padding: 6px 14px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--ink-2);
+    font-size: 12.5px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.16s var(--ease), color 0.16s var(--ease);
+  }
+  .visual-picker__tabs button[aria-pressed='true'] {
+    background: var(--card);
+    color: var(--ink);
+    font-weight: 600;
+    box-shadow: 0 1px 2px rgb(26 25 23 / 0.08);
+  }
+
+  .visual-picker__scroll {
+    max-height: 268px;
+    overflow-y: auto;
+    padding-right: 4px;
+    overscroll-behavior: contain;
+  }
+  .visual-picker__group {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin: 14px 0 8px;
+  }
+  .visual-picker__scroll section:first-child .visual-picker__group { margin-top: 0; }
+
+  .visual-picker__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
+    gap: 6px;
+  }
+  .visual-picker__cell {
+    aspect-ratio: 1;
+    display: grid;
+    place-items: center;
+    border-radius: 10px;
+    border: 1px solid transparent;
+    background: var(--paper);
+    color: var(--ink-2);
+    cursor: pointer;
+    transition: all 0.14s var(--ease);
+  }
+  .visual-picker__cell:hover { background: var(--card); border-color: var(--rule); color: var(--ink); }
+  .visual-picker__cell[aria-pressed='true'] {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .visual-picker__cell--emoji { font-size: 20px; line-height: 1; }
+
+  .visual-picker__photo-preview {
+    width: 100%;
+    max-height: 200px;
+    object-fit: cover;
+    border-radius: var(--radius);
+    border: 1px solid var(--rule);
+  }
+  .visual-picker__photo-empty {
+    display: grid;
+    place-items: center;
+    gap: 10px;
+    padding: 34px 20px;
+    text-align: center;
+    border: 1px dashed var(--rule);
+    border-radius: var(--radius);
+    color: var(--ink-3);
+    background: var(--paper);
+  }
+  .visual-picker__photo-empty p { margin: 0; font-size: 12.5px; max-width: 30ch; }
 
   /* ── Tableaux ─────────────────────────────────────────────────────────── */
   .row {

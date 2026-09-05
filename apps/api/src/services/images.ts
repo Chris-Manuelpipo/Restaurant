@@ -136,6 +136,31 @@ export async function processCover(
 }
 
 /**
+ * Photo de catégorie : carrée, petite. Elle s'affiche dans une tuile de 200 px au plus,
+ * côté back-office comme côté menu — inutile d'en stocker davantage.
+ */
+export async function processCategoryImage(
+  buffer: Buffer,
+  mimetype: string,
+  restaurantId: string,
+  categoryId: string,
+): Promise<{ key: string; url: string }> {
+  assertAcceptable(buffer, mimetype);
+  const storage = getStorage();
+  const hash = hashContent(buffer);
+
+  const webp = await sharp(buffer)
+    .rotate()
+    .resize({ width: 400, height: 400, fit: 'cover', position: 'attention' })
+    .webp({ quality: 74, effort: 5 })
+    .toBuffer();
+
+  const key = `restaurants/${restaurantId}/categories/${categoryId}-${hash}.webp`;
+  await storage.put(key, webp, 'image/webp');
+  return { key, url: storage.url(key) };
+}
+
+/**
  * Vignette de démonstration : un dégradé uni tiré de la charte. Sert aux seeds, pour ne
  * dépendre d'aucune photo tierce.
  */

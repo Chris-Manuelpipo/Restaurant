@@ -3,7 +3,10 @@
   "compilerOptions": {
     "lib": ["ES2023", "DOM"],
     "jsx": "react-jsx",
-    "noEmit": true
+    "noEmit": true,
+    "paths": {
+      "@evolyx/shared": ["../shared/src/index.ts"]
+    }
   },
   "include": ["src/**/*"]
 }

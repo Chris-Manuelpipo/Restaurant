@@ -24,6 +24,8 @@ export function ItemSheet({
   // proprement de zéro. C'est plus sûr qu'un effet qui remet les champs à leur valeur initiale.
   const [variantId, setVariantId] = useState<string | null>(item?.variants[0]?.id ?? null);
   const [extras, setExtras] = useState<Set<string>>(() => new Set());
+  /** Photo affichée dans la fiche : la première par défaut, les autres au glissement. */
+  const [photoIndex, setPhotoIndex] = useState(0);
   const closeRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -61,8 +63,6 @@ export function ItemSheet({
     });
   };
 
-  const image = item.images[0];
-
   return (
     <>
       <div className="scrim" onClick={onClose} aria-hidden />
@@ -79,21 +79,45 @@ export function ItemSheet({
           className="h-[172px] mx-[14px] mt-[14px] rounded-2xl relative overflow-hidden"
           style={{ background: 'var(--cover)' }}
         >
-          {image ? (
-            <picture>
-              <source
-                srcSet={`${image.medium} 480w, ${image.large} 960w`}
-                sizes="(max-width: 520px) 100vw, 492px"
-                type="image/webp"
-              />
-              <img
-                src={image.fallback}
-                alt=""
-                className="absolute inset-0 h-full w-full object-cover"
-                width={image.width}
-                height={image.height}
-              />
-            </picture>
+          {/*
+            Plusieurs photos : elles défilent horizontalement, avec accroche. Un carrousel à
+            flèches demanderait de viser une cible de 30 px sur un téléphone tenu d'une main —
+            le défilement natif, lui, se manipule au pouce.
+          */}
+          {item.images.length > 0 ? (
+            <div
+              className="sheet-gallery"
+              onScroll={(event) => {
+                const element = event.currentTarget;
+                setPhotoIndex(Math.round(element.scrollLeft / element.clientWidth));
+              }}
+            >
+              {item.images.map((photo, index) => (
+                <picture key={photo.thumb}>
+                  <source
+                    srcSet={`${photo.medium} 480w, ${photo.large} 960w`}
+                    sizes="(max-width: 520px) 100vw, 492px"
+                    type="image/webp"
+                  />
+                  <img
+                    src={photo.fallback}
+                    alt=""
+                    width={photo.width}
+                    height={photo.height}
+                    loading={index === 0 ? 'eager' : 'lazy'}
+                    decoding="async"
+                  />
+                </picture>
+              ))}
+            </div>
+          ) : null}
+
+          {item.images.length > 1 ? (
+            <div className="sheet-dots" aria-hidden>
+              {item.images.map((photo, index) => (
+                <span key={photo.thumb} data-active={index === photoIndex || undefined} />
+              ))}
+            </div>
           ) : null}
           <button
             ref={closeRef}

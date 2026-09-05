@@ -2,23 +2,31 @@ import { memo } from 'react';
 import type { JSX } from 'react';
 import { useTranslation } from '../lib/i18n';
 import { formatAmount, currencySymbol, type PublicMenuItem } from '@evolyx/shared';
+import { DishGlyph } from './DishGlyph';
+import { motifFor } from '../lib/motifs';
 
 /**
  * Une ligne de plat.
  *
- * Trois détails qui comptent sur le terrain :
+ * Quatre détails qui comptent sur le terrain :
  *  - les dimensions de l'image sont posées en dur : aucun décalage de mise en page quand la
  *    photo arrive, même sur une connexion qui la fait attendre dix secondes ;
  *  - `loading="lazy"` sur tout sauf les premières lignes ;
- *  - un plat épuisé reste affiché, grisé, prix barré : le client doit savoir ce qui existe.
+ *  - un plat épuisé reste affiché, grisé, prix barré : le client doit savoir ce qui existe ;
+ *  - sans photo, un dessin déduit du nom du plat — pas un point gris. Le repli doit rester
+ *    visiblement un dessin : le gérant doit continuer à vouloir photographier ses plats.
  */
 export const ItemRow = memo(function ItemRow({
   item,
   currency,
+  categoryName,
+  categoryIcon,
   onOpen,
 }: {
   item: PublicMenuItem;
   currency: string;
+  categoryName?: string;
+  categoryIcon?: string | null;
   onOpen: () => void;
 }): JSX.Element {
   const { t } = useTranslation();
@@ -48,9 +56,9 @@ export const ItemRow = memo(function ItemRow({
             />
           </picture>
         ) : (
-          <span aria-hidden className="text-[26px] opacity-40">
-            {'•'}
-          </span>
+          <DishGlyph
+            motif={motifFor({ id: item.id, name: item.name, categoryName, categoryIcon })}
+          />
         )}
         {soldOut ? <span className="badge-sold">{t('soldOut')}</span> : null}
       </span>

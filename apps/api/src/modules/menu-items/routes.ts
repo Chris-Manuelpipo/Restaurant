@@ -529,6 +529,49 @@ const menuItemRoutes: FastifyPluginAsync = async (app) => {
     }),
   );
 
+  /**
+   * Ordre des photos. La première est celle que le client voit sur la carte ; les suivantes
+   * n'apparaissent que dans la fiche du plat. Pouvoir la choisir compte : on photographie
+   * rarement le meilleur angle en premier.
+   */
+  app.post(
+    '/:id/images/reorder',
+    {
+      onRequest: [app.requires(CAPABILITIES.MENU_WRITE)],
+      schema: {
+        tags: ['menu'],
+        summary: 'Réordonne les photos d’un plat',
+        security: [{ bearerAuth: [] }],
+        params: idParam,
+        body: reorderSchema,
+      },
+    },
+    scoped(async (request, _reply, db) => {
+      const auth = requireAuth(request);
+      const { id } = request.params as { id: string };
+      const { ids } = request.body as z.infer<typeof reorderSchema>;
+
+      const item = await db.menuItem.findUnique({ where: { id }, select: { id: true } });
+      if (!item) throw notFound('Ce plat');
+
+      // `updateMany` porte le filtre du parent : une photo d'un autre plat ne bougera pas.
+      await db.$transaction(
+        ids.map((imageId, position) =>
+          db.menuItemImage.updateMany({ where: { id: imageId, menuItemId: id }, data: { position } }),
+        ),
+      );
+
+      await app.events.publish('menu_item.updated', {
+        restaurantId: auth.restaurantId!,
+        itemId: id,
+        changedFields: ['images'],
+        userId: auth.userId,
+      });
+
+      return db.menuItem.findUniqueOrThrow({ where: { id }, include });
+    }),
+  );
+
   /* ── Import par collage ────────────────────────────────────────────────── */
   app.post(
     '/import',

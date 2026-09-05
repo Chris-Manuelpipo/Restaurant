@@ -18,6 +18,7 @@ import { StatusPill } from '../components/StatusPill';
 import { MomentBanner } from '../components/MomentBanner';
 import { MenuSkeleton } from '../components/MenuSkeleton';
 import { ErrorScreen } from '../components/ErrorScreen';
+import { CategoryMark } from '../components/CategoryMark';
 
 export function MenuPage({ route }: { route: Route }): JSX.Element {
   const slug = route.slug!;
@@ -178,7 +179,10 @@ export function MenuPage({ route }: { route: Route }): JSX.Element {
               else sections.current.delete(category.id);
             }}
           >
-            <div className="flex items-baseline gap-3 mb-1">
+            <div className="flex items-center gap-3 mb-1">
+              <span style={{ color: 'var(--primary)' }} className="flex items-center">
+                <CategoryMark icon={category.icon} imageUrl={category.imageUrl} size={19} />
+              </span>
               <h2 className="cat-title m-0">{category.name}</h2>
               <span className="rule-line" />
             </div>
@@ -189,6 +193,8 @@ export function MenuPage({ route }: { route: Route }): JSX.Element {
                   key={item.id}
                   item={item}
                   currency={restaurant.currency}
+                  categoryName={category.name}
+                  categoryIcon={category.icon}
                   onOpen={() => setSelected(item)}
                 />
               ))}

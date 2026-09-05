@@ -160,6 +160,7 @@ export async function buildPublicMenu(query: MenuQuery): Promise<PublicMenuRespo
         id: category.id,
         name: resolveI18n(category.name as I18nText, locale),
         icon: category.icon,
+        imageUrl: category.imageUrl,
         color: category.color,
         items: mapped,
       });

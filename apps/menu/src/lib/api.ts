@@ -63,6 +63,7 @@ function absolutiseMedia(menu: PublicMenuResponse): PublicMenuResponse {
   menu.restaurant.coverUrl = mediaUrl(menu.restaurant.coverUrl);
 
   for (const category of menu.categories) {
+    category.imageUrl = mediaUrl(category.imageUrl);
     for (const item of category.items) {
       for (const image of item.images) {
         image.thumb = mediaUrl(image.thumb)!;

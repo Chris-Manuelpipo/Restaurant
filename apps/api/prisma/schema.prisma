@@ -183,7 +183,10 @@ model Category {
 
   /// { fr, en? }
   name     Json
+  /// Visuel court : « emoji:🔥 » ou « icon:flame ». Voir parseCategoryVisual().
   icon     String?
+  /// Photo de catégorie, quand le restaurant en a une — elle prime sur l'icône.
+  imageUrl String?
   color    String?
   position Int     @default(0)
 
