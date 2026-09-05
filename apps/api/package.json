@@ -51,6 +51,7 @@
     "@types/supertest": "^6.0.2",
     "@vitest/coverage-v8": "^2.1.8",
     "dotenv": "^17.4.2",
+    "jsqr": "^1.4.0",
     "pino-pretty": "^13.0.0",
     "prisma": "^6.2.1",
     "supertest": "^7.0.0",
