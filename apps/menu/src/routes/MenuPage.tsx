@@ -27,6 +27,8 @@ export function MenuPage(): JSX.Element {
   const [locale, setLocale] = useState<string | undefined>(forcedLocale);
   const [selected, setSelected] = useState<PublicMenuItem | null>(null);
   const [online, setOnline] = useState(() => navigator.onLine);
+  /** Réveil périodique : un menu laissé ouvert doit finir par se signaler comme daté. */
+  const [, setTick] = useState(0);
 
   /* Une seule requête peint toute la page. */
   const query = useQuery({
@@ -41,6 +43,11 @@ export function MenuPage(): JSX.Element {
   });
 
   const menu: PublicMenuResponse | undefined = query.data;
+
+  useEffect(() => {
+    const timer = setInterval(() => setTick((value) => value + 1), 60_000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const goOnline = (): void => setOnline(true);
@@ -67,6 +74,23 @@ export function MenuPage(): JSX.Element {
     [slug, locale, menu],
   );
 
+  /**
+   * Quand faut-il prévenir que la carte n'est peut-être plus à jour ?
+   *
+   * Pas sur `navigator.onLine` : il dit seulement qu'une interface réseau est active. Le cas
+   * courant ici est le Wi-Fi du restaurant sans lien Internet — il répond « oui » alors que
+   * rien ne passe. Pas davantage sur l'échec de la requête : le service worker sert sa copie
+   * et la requête réussit.
+   *
+   * Le signal fiable est l'âge de la réponse. Le serveur horodate chaque menu (`generatedAt`)
+   * et ne le garde que trente secondes ; une carte calculée il y a plus de cinq minutes vient
+   * forcément d'un cache — service worker, cache HTTP ou instantané local, peu importe lequel.
+   */
+  const STALE_AFTER_MS = 5 * 60 * 1000;
+  const age = menu ? Date.now() - new Date(menu.generatedAt).getTime() : 0;
+  const servingSnapshot =
+    Boolean(savedAt) && (!online || query.isError || age > STALE_AFTER_MS);
+
   /* Défilement vers une catégorie, sans dépendance ni calcul au scroll. */
   const sections = useRef(new Map<string, HTMLElement>());
   const scrollTo = (categoryId: string): void => {
@@ -90,7 +114,7 @@ export function MenuPage(): JSX.Element {
 
   return (
     <div className="shell">
-      {!online && savedAt ? <OfflineBanner savedAt={savedAt} /> : null}
+      {servingSnapshot && savedAt ? <OfflineBanner savedAt={menu.generatedAt} /> : null}
 
       <header className="cover reveal" style={coverStyle(restaurant.coverUrl)}>
         {!restaurant.coverUrl ? <div className="cover-grid" /> : null}

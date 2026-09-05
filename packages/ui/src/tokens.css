@@ -1,0 +1,75 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Identité Evolyx — l'outil, pas le restaurant.
+
+   Le back-office a sa propre identité, volontairement distincte de toute charte
+   de restaurant : ivoire, encre, vert forêt. La charte du client n'apparaît que
+   dans l'aperçu, encadrée — les deux ne se mélangent jamais, sans quoi le gérant
+   ne saurait plus ce qu'il regarde.
+
+   Référence visuelle : docs/maquettes/02-onboarding.html
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --paper: #f2f0ea;
+  --card: #ffffff;
+  --ink: #1a1917;
+  --ink-2: #5f5c55;
+  --ink-3: #918d84;
+  --rule: #e3dfd6;
+  --rule-2: #eeebe4;
+
+  --accent: #0f3d2e;
+  --accent-hover: #0b3125;
+  --accent-soft: #e7efeb;
+  --accent-line: #cfe0d8;
+
+  --amber: #b8791a;
+  --amber-soft: #fbf2e2;
+  --amber-line: #f0dfc0;
+
+  --danger: #a8341f;
+  --danger-soft: #fbece8;
+
+  --radius: 12px;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --shadow: 0 1px 2px rgb(26 25 23 / 0.05), 0 8px 24px -12px rgb(26 25 23 / 0.18);
+  --shadow-lg: 0 4px 12px rgb(26 25 23 / 0.06), 0 24px 60px -18px rgb(26 25 23 / 0.28);
+
+  --font-display: 'Bricolage Grotesque Variable', 'Bricolage Grotesque', system-ui, sans-serif;
+  --font-body: 'Inter Variable', Inter, system-ui, sans-serif;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+    color: inherit;
+  }
+
+  h1,
+  h2,
+  h3 {
+    margin: 0;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+}

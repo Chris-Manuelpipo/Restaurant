@@ -1,0 +1,312 @@
+/* Styles des composants du back-office. Rangés dans `components` pour rester
+   sous les utilitaires Tailwind — une classe utilitaire posée à l'usage doit
+   toujours l'emporter sur le style de base du composant. */
+
+@layer components {
+  /* ── Bouton ───────────────────────────────────────────────────────────── */
+  .evx-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    border-radius: 10px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition:
+      background 0.18s var(--ease),
+      border-color 0.18s var(--ease),
+      transform 0.18s var(--ease),
+      opacity 0.18s var(--ease);
+  }
+  .evx-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .evx-btn--sm { padding: 7px 12px; font-size: 12.5px; min-height: 34px; }
+  .evx-btn--md { padding: 10px 18px; font-size: 13.5px; min-height: 40px; }
+  .evx-btn--lg { padding: 13px 24px; font-size: 15px; min-height: 48px; }
+
+  .evx-btn--primary {
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 1px 2px rgb(15 61 46 / 0.3);
+  }
+  .evx-btn--primary:hover:not(:disabled) { background: var(--accent-hover); transform: translateY(-1px); }
+
+  .evx-btn--secondary {
+    background: var(--card);
+    border-color: var(--rule);
+    color: var(--ink);
+  }
+  .evx-btn--secondary:hover:not(:disabled) { border-color: var(--ink-3); }
+
+  .evx-btn--ghost { background: transparent; color: var(--ink-2); }
+  .evx-btn--ghost:hover:not(:disabled) { background: var(--rule-2); color: var(--ink); }
+
+  .evx-btn--danger { background: var(--danger-soft); color: var(--danger); border-color: #f3d9d2; }
+  .evx-btn--danger:hover:not(:disabled) { background: #f7ded7; }
+
+  .evx-spin { animation: evx-rotate 0.9s linear infinite; }
+  @keyframes evx-rotate { to { transform: rotate(360deg); } }
+
+  /* ── Champs ───────────────────────────────────────────────────────────── */
+  .evx-field { margin-top: 22px; }
+  .evx-field:first-child { margin-top: 0; }
+
+  .evx-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 3px;
+  }
+  .evx-label--required::after {
+    content: ' *';
+    color: var(--danger);
+  }
+
+  .evx-hint {
+    font-size: 12.5px;
+    color: var(--ink-3);
+    margin: 0 0 10px;
+    line-height: 1.45;
+  }
+
+  .evx-input {
+    width: 100%;
+    padding: 11px 13px;
+    border-radius: 10px;
+    border: 1px solid var(--rule);
+    background: var(--card);
+    font-size: 14px;
+    transition: border-color 0.18s var(--ease), box-shadow 0.18s var(--ease);
+    min-height: 42px;
+  }
+  .evx-input:focus {
+    outline: 0;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  .evx-input:disabled { background: var(--rule-2); color: var(--ink-3); }
+  .evx-input::placeholder { color: var(--ink-3); }
+
+  .evx-textarea { min-height: 110px; resize: vertical; line-height: 1.6; }
+
+  .evx-select {
+    appearance: none;
+    padding-right: 34px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' fill='none' stroke='%23918D84' stroke-width='2'%3E%3Cpath d='m1 1 5 5 5-5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 13px center;
+  }
+
+  .evx-error {
+    margin: 6px 0 0;
+    font-size: 12.5px;
+    color: var(--danger);
+  }
+
+  .evx-switch {
+    width: 42px;
+    height: 24px;
+    border-radius: 99px;
+    background: var(--rule);
+    border: 0;
+    padding: 3px;
+    display: inline-flex;
+    cursor: pointer;
+    transition: background 0.2s var(--ease);
+  }
+  .evx-switch[aria-checked='true'] { background: var(--accent); }
+  .evx-switch__knob {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.2);
+    transition: transform 0.2s var(--ease);
+  }
+  .evx-switch[aria-checked='true'] .evx-switch__knob { transform: translateX(18px); }
+
+  /* ── Carte ────────────────────────────────────────────────────────────── */
+  .evx-card {
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .evx-card__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 16px 18px;
+    border-bottom: 1px solid var(--rule-2);
+    background: #fbfaf7;
+  }
+  .evx-card__title {
+    font-family: var(--font-display);
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+  }
+  .evx-card__desc { margin: 3px 0 0; font-size: 12.5px; color: var(--ink-3); }
+  .evx-card__actions { display: flex; gap: 8px; flex: none; }
+  .evx-card__body { padding: 18px; }
+
+  /* ── Pastilles ────────────────────────────────────────────────────────── */
+  .evx-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3.5px 9px;
+    border-radius: 99px;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+  }
+  .evx-badge--neutral { background: var(--rule-2); color: var(--ink-2); }
+  .evx-badge--accent { background: var(--accent-soft); color: var(--accent); }
+  .evx-badge--success { background: #e3f2e9; color: #1c6b41; }
+  .evx-badge--warning { background: var(--amber-soft); color: var(--amber); }
+  .evx-badge--danger { background: var(--danger-soft); color: var(--danger); }
+
+  /* ── État vide ────────────────────────────────────────────────────────── */
+  .evx-empty {
+    text-align: center;
+    padding: 48px 24px;
+  }
+  .evx-empty__icon {
+    width: 52px;
+    height: 52px;
+    margin: 0 auto 16px;
+    border-radius: 14px;
+    display: grid;
+    place-items: center;
+    background: var(--paper);
+    color: var(--ink-3);
+  }
+  .evx-empty__title {
+    font-family: var(--font-display);
+    font-size: 16px;
+    font-weight: 700;
+  }
+  .evx-empty__desc {
+    margin: 7px auto 0;
+    max-width: 42ch;
+    font-size: 13px;
+    color: var(--ink-3);
+    line-height: 1.55;
+  }
+  .evx-empty__action { margin-top: 20px; }
+
+  /* ── Modale ───────────────────────────────────────────────────────────── */
+  .evx-modal { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 20px; }
+  .evx-modal__scrim {
+    position: absolute;
+    inset: 0;
+    background: rgb(26 25 23 / 0.45);
+    backdrop-filter: blur(2px);
+    animation: evx-fade 0.2s var(--ease);
+  }
+  .evx-modal__panel {
+    position: relative;
+    width: 100%;
+    max-height: 86dvh;
+    display: flex;
+    flex-direction: column;
+    background: var(--card);
+    border-radius: 16px;
+    box-shadow: var(--shadow-lg);
+    animation: evx-pop 0.24s var(--ease);
+  }
+  .evx-modal__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 20px 20px 14px;
+  }
+  .evx-modal__title { font-family: var(--font-display); font-size: 18px; font-weight: 700; letter-spacing: -0.02em; }
+  .evx-modal__desc { margin: 5px 0 0; font-size: 13px; color: var(--ink-3); line-height: 1.5; }
+  .evx-modal__close {
+    flex: none;
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    border: 0;
+    background: transparent;
+    color: var(--ink-3);
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+  }
+  .evx-modal__close:hover { background: var(--rule-2); color: var(--ink); }
+  .evx-modal__body { padding: 0 20px 20px; overflow-y: auto; }
+  .evx-modal__foot {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 14px 20px;
+    border-top: 1px solid var(--rule-2);
+    background: #fbfaf7;
+    border-radius: 0 0 16px 16px;
+  }
+
+  @keyframes evx-fade { from { opacity: 0; } }
+  @keyframes evx-pop {
+    from { opacity: 0; transform: translateY(8px) scale(0.99); }
+  }
+
+  /* ── Notifications ────────────────────────────────────────────────────── */
+  .evx-toasts {
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    transform: translateX(-50%);
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: center;
+    pointer-events: none;
+  }
+  .evx-toast {
+    padding: 11px 18px;
+    border-radius: 10px;
+    font-size: 13.5px;
+    font-weight: 500;
+    color: #fff;
+    background: var(--ink);
+    box-shadow: var(--shadow-lg);
+    animation: evx-toast-in 0.26s var(--ease);
+  }
+  .evx-toast--success { background: var(--accent); }
+  .evx-toast--error { background: var(--danger); }
+  @keyframes evx-toast-in {
+    from { opacity: 0; transform: translateY(10px); }
+  }
+
+  .evx-loading {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    color: var(--ink-3);
+    font-size: 13px;
+    padding: 24px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .evx-btn,
+  .evx-modal__panel,
+  .evx-toast,
+  .evx-switch__knob {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+  }
+}
