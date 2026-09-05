@@ -108,9 +108,14 @@ openssl rand -hex 48
 
 ## Ce qui est livré, et ce qui ne l'est pas
 
-**Vérifié** — 217 tests automatisés : 42 sur le package partagé, 94 sur le domaine (98 % de
-couverture), 39 d'intégration et d'isolation multi-tenant, 18 parcours de bout en bout et
-d'accessibilité dans un vrai navigateur.
+**Vérifié** — 235 tests automatisés :
+
+| Suite | Tests | Ce qu'elle couvre |
+|---|---:|---|
+| `packages/shared` | 42 | Thème et contraste, i18n et repli, fuseaux et minuit, montants |
+| `apps/api` — domaine | 94 | Visibilité (26 cas), ouverture, permissions, import, codes — 98 % de couverture |
+| `apps/api` — intégration | 81 | Isolation croisée (26), endpoints et erreurs, rôles, limitation de débit, images |
+| `e2e` | 18 | Les deux parcours de recette et l'accessibilité, dans un vrai Chrome |
 
 **Livré** — multi-tenant appliqué par la couche d'accès aux données, authentification et rôles,
 identité et charte, catégories et plats, variantes, suppléments, photos, règles horaires,
