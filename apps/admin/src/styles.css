@@ -22,12 +22,22 @@
   /* Rail replié : les icônes seules, le titre revient en infobulle. */
   .app-shell[data-collapsed] { grid-template-columns: 68px minmax(0, 1fr); }
   .app-shell[data-collapsed] .rail-label { display: none; }
-  .app-shell[data-collapsed] .rail { padding: 22px 12px; align-items: center; }
-  .app-shell[data-collapsed] .brand { justify-content: center; margin-bottom: 22px; }
-  .app-shell[data-collapsed] .nav-link { justify-content: center; padding: 10px; }
+  .app-shell[data-collapsed] .rail { padding: 22px 12px; }
   .app-shell[data-collapsed] .nav-kicker { display: none; }
-  .app-shell[data-collapsed] .rail-toggle { position: absolute; top: 68px; right: 12px; }
-  .app-shell[data-collapsed] .rail-foot .evx-btn { padding: 8px; }
+  /*
+   * Le nom du produit disparaît : le repère et le bouton de repli s'empilent alors sur l'axe
+   * de la colonne d'icônes. Le bouton reste dans le flux — le sortir en absolu le décalait
+   * du rang des icônes et le posait sur le premier lien.
+   */
+  .app-shell[data-collapsed] .brand {
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  .app-shell[data-collapsed] .rail-toggle { margin-left: 0; }
+  .app-shell[data-collapsed] .nav-link { justify-content: center; padding: 10px; }
+  .app-shell[data-collapsed] .rail-foot { display: grid; justify-items: center; }
+  .app-shell[data-collapsed] .rail-foot .evx-btn { padding: 8px; width: 40px; }
 
   @media (max-width: 860px) {
     .app-shell,
@@ -166,6 +176,14 @@
   @media (max-width: 860px) {
     .page { padding: 20px 18px 60px; }
   }
+
+  /**
+   * Les écrans faits de cartes prennent la largeur disponible : plafonner à 1180 px laissait
+   * un vide à droite sur un écran large alors que la grille sait s'étendre. Le plafond de
+   * lecture reste pour les pages de formulaire, où une ligne trop longue devient illisible ;
+   * ici la limite est celle du confort de balayage, bien plus haute.
+   */
+  .page--wide { max-width: 1720px; }
 
   .page-title {
     font-family: var(--font-display);

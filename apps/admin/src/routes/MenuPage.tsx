@@ -192,7 +192,7 @@ export function MenuPage(): JSX.Element {
           }
         />
 
-        <div className="page">
+        <div className="page page--wide">
           <div className="menu-toolbar">
             <Breadcrumb
               items={[
@@ -357,7 +357,7 @@ export function MenuPage(): JSX.Element {
         }
       />
 
-      <div className="page">
+      <div className="page page--wide">
         <StatRow>
           <StatCard
             label="Plats à la carte"
