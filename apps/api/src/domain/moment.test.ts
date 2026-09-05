@@ -31,7 +31,8 @@ describe('composeMomentBanner', () => {
 
   it('nomme le plat quand un seul est épuisé', () => {
     const banner = composeMomentBanner({ activePromos: [], soldOut: [{ name: 'Poulet DG' }] });
-    expect(banner).toBe('Poulet DG est épuisé.');
+    // Formulation sans accord : le genre du plat est inconnu du serveur.
+    expect(banner).toBe('Plus de Poulet DG pour le moment.');
   });
 
   it('compte les plats quand plusieurs sont épuisés', () => {
@@ -39,7 +40,7 @@ describe('composeMomentBanner', () => {
       activePromos: [],
       soldOut: [{ name: 'Poulet DG' }, { name: 'Ndolè' }, { name: 'Eru' }],
     });
-    expect(banner).toBe('3 plats sont épuisés.');
+    expect(banner).toBe('3 plats ne sont plus disponibles.');
   });
 
   it('respecte l’ordre du cahier des charges : promotions, puis manques', () => {
@@ -49,7 +50,7 @@ describe('composeMomentBanner', () => {
       runningLow: [{ name: 'Maquereau' }],
     });
     expect(banner).toBe(
-      'Happy hour −30 % jusqu’à 19:00. Maquereau touche à sa fin. Poulet DG est épuisé.',
+      'Happy hour −30 % jusqu’à 19:00. Maquereau touche à sa fin. Plus de Poulet DG pour le moment.',
     );
   });
 

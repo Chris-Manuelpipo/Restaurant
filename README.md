@@ -77,7 +77,8 @@ Deux restaurants sont livrés, choisis pour éprouver des cas opposés :
 | `pnpm typecheck` | Vérifie les types de bout en bout |
 | `pnpm test` | Tests unitaires et d'intégration |
 | `pnpm --filter @evolyx/api test:coverage` | Couverture du domaine (seuil 80 %) |
-| `pnpm e2e` | Les deux parcours de recette, dans un vrai Chrome |
+| `pnpm e2e` | Les deux parcours de recette et l'accessibilité, dans un vrai Chrome |
+| `node e2e/scripts/measure.mjs` | Mesure le LCP en Slow 4G, processeur ×4 |
 | `pnpm seed` | Remplit la base avec les deux restaurants |
 | `pnpm db:reset` | Réinitialise la base et rejoue les migrations |
 | `node apps/menu/scripts/budget.mjs` | Vérifie le budget de 300 Ko du menu client |
@@ -106,6 +107,10 @@ openssl rand -hex 48
 ---
 
 ## Ce qui est livré, et ce qui ne l'est pas
+
+**Vérifié** — 217 tests automatisés : 42 sur le package partagé, 94 sur le domaine (98 % de
+couverture), 39 d'intégration et d'isolation multi-tenant, 18 parcours de bout en bout et
+d'accessibilité dans un vrai navigateur.
 
 **Livré** — multi-tenant appliqué par la couche d'accès aux données, authentification et rôles,
 identité et charte, catégories et plats, variantes, suppléments, photos, règles horaires,

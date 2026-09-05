@@ -655,7 +655,7 @@ describe('menu public', () => {
 
     const après = await app.inject({ method: 'GET', url: `${API}/public/r/${world.a.slug}/menu` });
     expect(après.json().moment).not.toBe(nomAvant);
-    expect(après.json().moment).toContain('épuisé');
+    expect(après.json().moment).toContain('Plus de');
 
     await app.inject({
       method: 'PATCH',

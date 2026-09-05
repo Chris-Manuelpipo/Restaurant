@@ -24,8 +24,10 @@ const resources = {
         promo: '{{label}}.',
         runningLow_one: '{{name}} touche à sa fin.',
         runningLow_other: '{{count}} plats touchent à leur fin.',
-        soldOut_one: '{{name}} est épuisé.',
-        soldOut_other: '{{count}} plats sont épuisés.',
+        // Sans genre : « épuisé » exigerait un accord que le nom du plat ne donne pas —
+        // « Margherita est épuisé » est faux, « Pizza DG est épuisée » aussi si c'est un plat.
+        soldOut_one: 'Plus de {{name}} pour le moment.',
+        soldOut_other: '{{count}} plats ne sont plus disponibles.',
         allAvailable: 'Tout le menu est disponible.',
       },
     },
