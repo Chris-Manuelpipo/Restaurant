@@ -144,15 +144,21 @@ test('le QR de la table 3 est réaffecté vers la table 7, sans réimpression', 
 });
 
 test('le menu reste consultable hors ligne après une première visite', async ({ page, context }) => {
-  // On simule le client qui revient le lendemain, sans réseau : l'horloge avance de deux heures.
-  await page.clock.install();
-
   await page.goto(`${MENU}/r/${SLUG}`);
   await expect(page.getByRole('heading', { name: 'Casa Lina' })).toBeVisible();
-  // Laisser le service worker prendre la main sur la page.
+
+  /*
+   * Laisser le service worker prendre la main, avec l'horloge réelle : le menu diffère son
+   * enregistrement d'une seconde et demie pour ne pas disputer la bande passante au premier
+   * affichage. Sous une horloge factice ce délai ne s'écoulerait jamais, et l'on testerait
+   * un hors-ligne qui n'a jamais été mis en cache.
+   */
   await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller), null, {
     timeout: 15_000,
   });
+
+  // Le cache est en place : on peut figer le temps pour simuler le retour du lendemain.
+  await page.clock.install();
 
   await context.setOffline(true);
   await page.reload();
