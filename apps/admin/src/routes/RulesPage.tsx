@@ -34,7 +34,7 @@ export function RulesPage(): JSX.Element {
   const [editing, setEditing] = useState<Rule | 'new' | null>(null);
   const [previewAt, setPreviewAt] = useState<string | null>(null);
 
-  const moments = useMemo(previewMoments, []);
+  const moments = useMemo(() => previewMoments(), []);
 
   const rules = useQuery({ queryKey: ['rules'], queryFn: () => api.get<Rule[]>('/availability-rules') });
   const categories = useQuery({

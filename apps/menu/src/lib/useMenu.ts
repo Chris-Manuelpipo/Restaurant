@@ -30,10 +30,13 @@ const REFRESH_AFTER_MS = 60_000;
 
 export function useMenu(slug: string, locale: string | undefined): MenuState {
   const key = locale ?? 'default';
-  const snapshot = useRef(readSnapshot(slug, key));
 
-  const [data, setData] = useState<PublicMenuResponse | undefined>(snapshot.current?.payload);
-  const [isLoading, setIsLoading] = useState(!snapshot.current);
+  // L'instantané est lu une seule fois, à l'initialisation : la carte de la dernière visite
+  // s'affiche donc au premier rendu, avant même que la requête ne parte.
+  const [data, setData] = useState<PublicMenuResponse | undefined>(
+    () => readSnapshot(slug, key)?.payload,
+  );
+  const [isLoading, setIsLoading] = useState(() => !readSnapshot(slug, key));
   const [error, setError] = useState<unknown>(null);
   const [fromNetwork, setFromNetwork] = useState(false);
 

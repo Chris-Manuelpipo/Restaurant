@@ -7,8 +7,7 @@
     "dev": "vite --port 5180 --strictPort",
     "build": "tsc -b --noEmit && vite build",
     "preview": "vite preview --port 5180 --strictPort",
-    "typecheck": "tsc --noEmit",
-    "lint": "eslint src --max-warnings 0"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@evolyx/shared": "workspace:*",

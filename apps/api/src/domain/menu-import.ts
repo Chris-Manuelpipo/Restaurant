@@ -27,7 +27,7 @@ function looksLikeHeading(line: string): boolean {
 }
 
 /** Repère le prix en fin de ligne, avec ou sans devise, avec ou sans séparateur de milliers. */
-const TRAILING_PRICE = /([0-9][0-9\s  .,']*)\s*(fcfa|xaf|cfa|frs|fr|f)?\s*$/i;
+const TRAILING_PRICE = /([0-9][0-9\s\u00A0\u202F.,']*)\s*(fcfa|xaf|cfa|frs|fr|f)?\s*$/i;
 
 export function parseMenuText(text: string): MenuImportPreview {
   const rows: MenuImportRow[] = [];

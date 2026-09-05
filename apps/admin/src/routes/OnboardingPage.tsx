@@ -43,7 +43,7 @@ export function OnboardingPage(): JSX.Element {
   const [draft, setDraft] = useState<RestaurantDraft | null>(null);
   const [previewAt, setPreviewAt] = useState<string | null>(null);
 
-  const moments = useMemo(previewMoments, []);
+  const moments = useMemo(() => previewMoments(), []);
 
   const restaurant = useQuery({
     queryKey: ['restaurant'],

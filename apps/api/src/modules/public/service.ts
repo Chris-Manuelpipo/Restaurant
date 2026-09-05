@@ -9,7 +9,6 @@ import {
   type PublicMenuResponse,
   type PublicOpening,
   type PublicRestaurant,
-  type ThemeInput,
 } from '@evolyx/shared';
 import { asSystem, asTenant } from '../../db/index.js';
 import { AppError, notFound } from '../../lib/errors.js';

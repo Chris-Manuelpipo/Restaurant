@@ -27,15 +27,19 @@ export function MenuPage({ route }: { route: Route }): JSX.Element {
   const [locale, setLocale] = useState<string | undefined>(route.locale);
   const [selected, setSelected] = useState<PublicMenuItem | null>(null);
   const [online, setOnline] = useState(() => navigator.onLine);
-  /** Réveil périodique : un menu laissé ouvert doit finir par se signaler comme daté. */
-  const [, setTick] = useState(0);
+  /**
+   * L'heure courante vit dans l'état, réveillée chaque minute : un menu laissé ouvert doit
+   * finir par se signaler comme daté, et un rendu ne doit jamais dépendre d'une valeur qui
+   * change sans que React le sache.
+   */
+  const [now, setNow] = useState<number>(() => Date.now());
 
   /* Une seule requête peint toute la page ; la dernière carte connue s'affiche avant elle. */
   const query = useMenu(slug, locale);
   const menu: PublicMenuResponse | undefined = query.data;
 
   useEffect(() => {
-    const timer = setInterval(() => setTick((value) => value + 1), 60_000);
+    const timer = setInterval(() => setNow(Date.now()), 60_000);
     return () => clearInterval(timer);
   }, []);
 
@@ -57,8 +61,11 @@ export function MenuPage({ route }: { route: Route }): JSX.Element {
     document.title = menu.restaurant.name;
   }, [menu, slug, locale]);
 
+  // `menu` est bien une dépendance : c'est son arrivée qui vient de réécrire l'instantané,
+  // donc sa date d'enregistrement. La règle ne peut pas le voir, le commentaire le dit.
   const savedAt = useMemo(
     () => readSnapshot(slug, locale ?? 'default')?.savedAt ?? null,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [slug, locale, menu],
   );
 
@@ -75,7 +82,7 @@ export function MenuPage({ route }: { route: Route }): JSX.Element {
    * forcément d'un cache — service worker, cache HTTP ou instantané local, peu importe lequel.
    */
   const STALE_AFTER_MS = 5 * 60 * 1000;
-  const age = menu ? Date.now() - new Date(menu.generatedAt).getTime() : 0;
+  const age = menu ? now - new Date(menu.generatedAt).getTime() : 0;
   const servingSnapshot =
     Boolean(savedAt) && (!online || Boolean(query.error) || age > STALE_AFTER_MS);
 
@@ -193,6 +200,7 @@ export function MenuPage({ route }: { route: Route }): JSX.Element {
       <InfoFooter restaurant={restaurant} opening={opening} tableCode={tableCode} />
 
       <ItemSheet
+        key={selected?.id ?? 'none'}
         item={selected}
         currency={restaurant.currency}
         onClose={() => setSelected(null)}

@@ -32,7 +32,7 @@ export function BrandingPage(): JSX.Element {
   const [tab, setTab] = useState<(typeof TABS)[number]['key']>('identity');
   const [draft, setDraft] = useState<RestaurantDraft | null>(null);
   const [previewAt, setPreviewAt] = useState<string | null>(null);
-  const moments = useMemo(previewMoments, []);
+  const moments = useMemo(() => previewMoments(), []);
 
   const restaurant = useQuery({
     queryKey: ['restaurant'],

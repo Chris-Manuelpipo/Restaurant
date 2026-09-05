@@ -91,7 +91,7 @@ test('une règle de visibilité se pose sur une catégorie, et l’aperçu la v�
   await expect(page.locator('.phone__screen')).not.toContainText('Brunch', { timeout: 15_000 });
 });
 
-test('la promotion happy hour est annoncée au bon créneau', async ({ page, request }) => {
+test('la promotion happy hour est annoncée au bon créneau', async ({ request }) => {
   // Jeudi 18 h, heure de Douala : l'happy hour court de 17 h à 19 h.
   const jeudi18h = prochainJour(4, 18);
 

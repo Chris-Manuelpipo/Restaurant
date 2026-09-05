@@ -5,7 +5,6 @@ import {
   createAccessPointsSchema,
   updateAccessPointSchema,
   type AccessPointKind,
-  type ThemeInput,
 } from '@evolyx/shared';
 import { CAPABILITIES } from '../../domain/permissions.js';
 import { generateAccessCode } from '../../domain/access-code.js';

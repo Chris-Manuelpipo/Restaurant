@@ -20,14 +20,14 @@ export function ItemSheet({
   onClose: () => void;
 }): JSX.Element | null {
   const { t } = useTranslation();
-  const [variantId, setVariantId] = useState<string | null>(null);
-  const [extras, setExtras] = useState<Set<string>>(new Set());
+  // La feuille est montée avec `key={item.id}` : changer de plat la remonte, et l'état repart
+  // proprement de zéro. C'est plus sûr qu'un effet qui remet les champs à leur valeur initiale.
+  const [variantId, setVariantId] = useState<string | null>(item?.variants[0]?.id ?? null);
+  const [extras, setExtras] = useState<Set<string>>(() => new Set());
   const closeRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!item) return;
-    setVariantId(item.variants[0]?.id ?? null);
-    setExtras(new Set());
     closeRef.current?.focus();
 
     // La page derrière ne doit pas défiler pendant que la feuille est ouverte.
