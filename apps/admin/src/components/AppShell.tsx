@@ -162,6 +162,13 @@ export function AppShell(): JSX.Element {
     if (!isLoading && !session) void navigate({ to: '/connexion' });
   }, [isLoading, session, navigate]);
 
+  // Un compte plateforme n'est rattaché à aucun restaurant : les écrans d'un restaurant lui
+  // répondraient tous par un refus. On le ramène à l'espace plateforme, y compris depuis `/`.
+  const withoutRestaurant = Boolean(session) && !session?.restaurant;
+  useEffect(() => {
+    if (withoutRestaurant && pathname !== '/plateforme') void navigate({ to: '/plateforme' });
+  }, [withoutRestaurant, pathname, navigate]);
+
   if (isLoading) {
     return (
       <div className="grid place-items-center min-h-dvh">
@@ -172,10 +179,13 @@ export function AppShell(): JSX.Element {
 
   if (!session) return <div />;
 
+  // Hors de la section plateforme, chaque écran s'exerce sur un restaurant : sans restaurant
+  // dans la session, le rôle a beau en avoir la capacité, l'API refuserait.
   const visible = NAV.filter(
     (entry) =>
       (!entry.capability || can(entry.capability)) &&
-      (!entry.module || hasModule(entry.module as never)),
+      (!entry.module || hasModule(entry.module as never)) &&
+      (entry.section === 'plateforme' || Boolean(session.restaurant)),
   );
 
   const sections = ['quotidien', 'reglages', 'plateforme'] as const;

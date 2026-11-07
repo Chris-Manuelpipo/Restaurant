@@ -1,7 +1,9 @@
 import {
   createContext,
   useContext,
+  useEffect,
   useMemo,
+  useRef,
   useSyncExternalStore,
   type JSX,
   type ReactNode,
@@ -46,6 +48,22 @@ export function SessionProvider({ children }: { children: ReactNode }): JSX.Elem
     retry: false,
     staleTime: 5 * 60 * 1000,
   });
+
+  // Les données d'une session ne doivent jamais s'afficher dans la suivante : sur un poste
+  // partagé, la personne qui se connecte après la déconnexion verrait sinon la carte, l'équipe
+  // ou le journal du restaurant précédent, tirés du cache. On vide donc tout ce qui n'est pas
+  // la session elle-même dès que le jeton disparaît ou que l'utilisateur change.
+  const userId = query.data?.user.id ?? null;
+  const previousUserId = useRef<string | null>(null);
+  useEffect(() => {
+    const changedUser =
+      previousUserId.current !== null && userId !== null && previousUserId.current !== userId;
+    if (!token || changedUser) {
+      queryClient.removeQueries({ predicate: (cached) => cached.queryKey[0] !== 'session' });
+    }
+    if (!token) previousUserId.current = null;
+    else if (userId !== null) previousUserId.current = userId;
+  }, [token, userId, queryClient]);
 
   const value = useMemo<SessionContextValue>(() => {
     const session = query.data ?? null;
