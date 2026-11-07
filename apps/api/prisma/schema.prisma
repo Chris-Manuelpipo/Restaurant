@@ -55,7 +55,6 @@ enum AccessPointKind {
   OTHER
 }
 
-model Restaurant {
 enum TableStatus {
   FREE
   OCCUPIED
@@ -63,6 +62,7 @@ enum TableStatus {
   OUT_OF_SERVICE
 }
 
+model Restaurant {
   id       String           @id @default(cuid(2))
   slug     String           @unique
   name     String
@@ -104,8 +104,8 @@ enum TableStatus {
   menuItems         MenuItem[]
   availabilityRules AvailabilityRule[]
   accessPoints      AccessPoint[]
-  auditLogs         AuditLog[]
   diningTables      DiningTable[]
+  auditLogs         AuditLog[]
   invitations       Invitation[]
 
   @@index([status])
@@ -329,14 +329,13 @@ model AccessPoint {
   createdAt DateTime  @default(now())
   revokedAt DateTime?
 
-  @@index([restaurantId, isActive])
   /// La table physique à laquelle ce code est posé, s'il y en a une.
   table DiningTable?
 
+  @@index([restaurantId, isActive])
   @@index([restaurantId, kind])
 }
 
-model AuditLog {
 /// Une table de la salle — l'objet que gère le personnel, distinct du carton QR posé dessus.
 /// Nommée `DiningTable` : `Table` est un mot réservé en SQL.
 model DiningTable {
@@ -367,6 +366,7 @@ model DiningTable {
   @@index([restaurantId, zone])
 }
 
+model AuditLog {
   id String @id @default(cuid(2))
 
   restaurantId String?
