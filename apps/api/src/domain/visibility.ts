@@ -8,15 +8,20 @@ import { parseHHMM, zonedParts } from '@evolyx/shared';
  *  2. sa catégorie est visible et non archivée ;
  *  3. aucune règle VISIBILITY ne le concerne, **ou** au moins une le concerne et correspond
  *     à l'instant demandé ;
- *  4. `SOLD_OUT` reste visible — marqué épuisé, jamais masqué : le client doit savoir ce que
+ *  4. aucune règle HIDE posée sur lui **ou** sur sa catégorie ne correspond à l'instant ;
+ *  5. `SOLD_OUT` reste visible — marqué épuisé, jamais masqué : le client doit savoir ce que
  *     la maison sert d'habitude.
  *
- * Une règle posée sur une catégorie s'applique à tous ses plats ; une règle posée sur un plat
- * l'emporte sur celle de sa catégorie.
+ * Une règle VISIBILITY posée sur une catégorie s'applique à tous ses plats ; une règle
+ * VISIBILITY posée sur un plat l'emporte sur celle de sa catégorie.
+ *
+ * Les règles HIDE, elles, s'additionnent au lieu de se remplacer : masquer les grillades le
+ * dimanche midi masque chacune d'elles, quelles que soient leurs propres règles. Un masquage
+ * l'emporte toujours sur une visibilité — c'est la consigne la plus prudente des deux.
  */
 
 export type RuleTargetType = 'CATEGORY' | 'ITEM';
-export type RuleKind = 'VISIBILITY' | 'PROMO';
+export type RuleKind = 'VISIBILITY' | 'HIDE' | 'PROMO';
 
 export interface RuleRow {
   id: string;
@@ -89,9 +94,25 @@ export function rulesFor(
   );
 }
 
+/** Une règle HIDE visant cette cible est-elle en cours ? */
+function isHiddenNow(
+  targetType: RuleTargetType,
+  targetId: string,
+  context: VisibilityContext,
+): boolean {
+  return context.rules.some(
+    (r) =>
+      r.kind === 'HIDE' &&
+      r.targetType === targetType &&
+      r.targetId === targetId &&
+      ruleMatches(r, context.at, context.timezone),
+  );
+}
+
 export function isCategoryVisible(category: CategoryRow, context: VisibilityContext): boolean {
   if (category.archivedAt !== null) return false;
   if (!category.isVisible) return false;
+  if (isHiddenNow('CATEGORY', category.id, context)) return false;
 
   const rules = context.rules.filter(
     (r) => r.kind === 'VISIBILITY' && r.targetType === 'CATEGORY' && r.targetId === category.id,
@@ -111,6 +132,10 @@ export function isItemVisible(
   // Sans catégorie retrouvée, on masque : un plat orphelin ne doit pas apparaître au client.
   if (!category) return false;
   if (category.archivedAt !== null || !category.isVisible) return false;
+
+  // Le masquage passe avant tout : celui du plat comme celui de sa catégorie.
+  if (isHiddenNow('ITEM', item.id, context)) return false;
+  if (isHiddenNow('CATEGORY', category.id, context)) return false;
 
   const rules = rulesFor(item, context.rules, 'VISIBILITY');
   if (rules.length === 0) {

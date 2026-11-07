@@ -3,9 +3,10 @@ import { hhmmSchema, i18nTextOptionalSchema, idSchema } from './common.js';
 import { RULE_KINDS, RULE_TARGETS } from '../constants.js';
 
 /**
- * Règle de disponibilité : rend un plat ou une catégorie visible sur un créneau
- * (`VISIBILITY` — le brunch du dimanche matin) ou signale une promotion (`PROMO` —
- * l'happy hour). Le créneau peut passer minuit, comme les horaires d'ouverture.
+ * Règle de disponibilité : rend un plat ou une catégorie visible seulement sur un créneau
+ * (`VISIBILITY` — le brunch du dimanche matin), le masque pendant un créneau (`HIDE` — pas
+ * de grillades le dimanche midi) ou signale une promotion (`PROMO` — l'happy hour). Le
+ * créneau peut passer minuit, comme les horaires d'ouverture.
  */
 export const createRuleSchema = z
   .object({

@@ -38,7 +38,14 @@ export const TABLE_STATUSES = ['FREE', 'OCCUPIED', 'RESERVED', 'OUT_OF_SERVICE']
 export type TableStatus = (typeof TABLE_STATUSES)[number];
 
 export const RULE_TARGETS = ['CATEGORY', 'ITEM'] as const;
-export const RULE_KINDS = ['VISIBILITY', 'PROMO'] as const;
+/**
+ * `VISIBILITY` — visible **seulement** pendant le créneau (le brunch du dimanche) ;
+ * `HIDE`       — masqué pendant le créneau, visible le reste du temps (pas de grillades le
+ *                dimanche midi) ;
+ * `PROMO`      — promotion annoncée pendant le créneau, ne masque jamais rien.
+ */
+export const RULE_KINDS = ['VISIBILITY', 'HIDE', 'PROMO'] as const;
+export type RuleKind = (typeof RULE_KINDS)[number];
 
 export const LOCALES = ['fr', 'en'] as const;
 export type Locale = (typeof LOCALES)[number];

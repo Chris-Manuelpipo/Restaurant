@@ -1,7 +1,7 @@
 import { useMemo, useState, type JSX } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge, Button, EmptyState, Field, Input, Modal, Select, Spin, useToast } from '@evolyx/ui';
-import { dayName, resolveI18n, type I18nText } from '@evolyx/shared';
+import { RULE_KINDS, dayName, resolveI18n, type I18nText, type RuleKind } from '@evolyx/shared';
 import { ApiRequestError, api } from '../lib/api';
 import { useSession } from '../lib/session';
 import { PageHeader } from '../components/PageHeader';
@@ -10,16 +10,50 @@ import { MenuPreview, previewMoments } from '../components/MenuPreview';
 /**
  * Horaires des plats — les règles de disponibilité.
  *
- * Deux usages, un seul écran : masquer une catégorie hors de son créneau (le brunch du
- * dimanche) ou annoncer une promotion (l'happy hour). L'aperçu à droite permet de vérifier
- * l'effet **avant** que le client ne le découvre : c'est tout l'intérêt du paramètre `at`.
+ * Trois usages, un seul écran : n'afficher une catégorie que sur son créneau (le brunch du
+ * dimanche), retirer un plat le temps d'un service, ou annoncer une promotion (l'happy hour).
+ * L'aperçu à droite permet de vérifier l'effet **avant** que le client ne le découvre : c'est
+ * tout l'intérêt du paramètre `at`.
+ *
+ * Chaque règle se lit en clair, avec ce qui se passe **hors** du créneau : « Visibilité » seul
+ * laissait croire qu'on masquait le plat, alors qu'on le réservait au créneau.
  */
+
+const KIND_COPY: Record<
+  RuleKind,
+  { badge: string; tone: 'accent' | 'danger' | 'warning'; button: string; during: string; outside: string | null; modal: string }
+> = {
+  VISIBILITY: {
+    badge: 'Visible seulement',
+    tone: 'accent',
+    button: 'Visible seulement pendant',
+    during: 'Visible seulement',
+    outside: 'masqué le reste du temps',
+    modal: 'L’élément n’apparaît que pendant ce créneau ; le reste du temps, il disparaît du menu client.',
+  },
+  HIDE: {
+    badge: 'Masqué',
+    tone: 'danger',
+    button: 'Masqué pendant',
+    during: 'Masqué',
+    outside: 'visible le reste du temps',
+    modal: 'L’élément disparaît du menu client pendant ce créneau, et revient ensuite.',
+  },
+  PROMO: {
+    badge: 'Promotion',
+    tone: 'warning',
+    button: 'Promotion',
+    during: 'Annoncée',
+    outside: null,
+    modal: 'La promotion est affichée aux clients pendant le créneau.',
+  },
+};
 
 interface Rule {
   id: string;
   targetType: 'CATEGORY' | 'ITEM';
   targetId: string;
-  kind: 'VISIBILITY' | 'PROMO';
+  kind: RuleKind;
   daysOfWeek: number[];
   startTime: string;
   endTime: string;
@@ -76,7 +110,7 @@ export function RulesPage(): JSX.Element {
     <>
       <PageHeader
         title="Horaires des plats"
-        lede="Faites apparaître le brunch le dimanche matin, annoncez l’happy hour du soir."
+        lede="Faites apparaître le brunch le dimanche matin, retirez un plat le temps d’un service, annoncez l’happy hour du soir."
         actions={
           writable ? (
             <Button size="sm" variant="primary" onClick={() => setEditing('new')}>
@@ -91,7 +125,7 @@ export function RulesPage(): JSX.Element {
           {list.length === 0 ? (
             <EmptyState
               title="Aucune règle pour l’instant"
-              description="Sans règle, tous vos plats visibles sont servis à toute heure d’ouverture. Ajoutez-en une pour réserver une catégorie à un créneau, ou pour annoncer une promotion."
+              description="Sans règle, tous vos plats visibles sont servis à toute heure d’ouverture. Ajoutez-en une pour réserver une catégorie à un créneau, retirer un plat pendant un service, ou annoncer une promotion."
               action={
                 writable ? (
                   <Button variant="primary" onClick={() => setEditing('new')}>
@@ -109,19 +143,19 @@ export function RulesPage(): JSX.Element {
                   style={{ borderColor: rule.kind === 'PROMO' ? 'var(--amber-line)' : undefined }}
                 >
                   <div className="evx-card__body flex items-center gap-4">
-                    <Badge tone={rule.kind === 'PROMO' ? 'warning' : 'accent'}>
-                      {rule.kind === 'PROMO' ? 'Promotion' : 'Visibilité'}
-                    </Badge>
+                    <Badge tone={KIND_COPY[rule.kind].tone}>{KIND_COPY[rule.kind].badge}</Badge>
 
                     <div className="flex-1 min-w-0">
                       <p className="m-0 font-semibold truncate">
                         {rule.label ? resolveI18n(rule.label) : nameOf(rule)}
+                        {rule.targetType === 'CATEGORY' && !rule.label ? (
+                          <span className="font-normal" style={{ color: 'var(--ink-3)' }}>
+                            {' '}· toute la catégorie
+                          </span>
+                        ) : null}
                       </p>
                       <p className="m-0 text-[12.5px]" style={{ color: 'var(--ink-3)' }}>
-                        {rule.kind === 'PROMO' ? `${nameOf(rule)} · ` : ''}
-                        {describeDays(rule.daysOfWeek)} de {rule.startTime} à {rule.endTime}
-                        {rule.endTime <= rule.startTime ? ' (le lendemain)' : ''}
-                        {rule.discountPercent ? ` · −${rule.discountPercent} %` : ''}
+                        {describeRule(rule, rule.kind === 'PROMO' ? nameOf(rule) : null)}
                       </p>
                     </div>
 
@@ -256,11 +290,7 @@ function RuleModal({
       open
       onClose={onClose}
       title={rule ? 'Modifier la règle' : 'Nouvelle règle'}
-      description={
-        kind === 'VISIBILITY'
-          ? 'Hors de ce créneau, l’élément disparaît du menu client.'
-          : 'La promotion est affichée aux clients pendant le créneau.'
-      }
+      description={KIND_COPY[kind].modal}
       width={540}
       footer={
         <>
@@ -273,16 +303,17 @@ function RuleModal({
     >
       <Field label="Type de règle">
         {() => (
-          <div className="flex gap-2">
-            {(['VISIBILITY', 'PROMO'] as const).map((value) => (
+          <div className="flex flex-wrap gap-2">
+            {RULE_KINDS.map((value) => (
               <button
                 key={value}
                 type="button"
                 disabled={Boolean(rule)}
+                aria-pressed={kind === value}
                 className={`evx-btn evx-btn--sm ${kind === value ? 'evx-btn--secondary' : 'evx-btn--ghost'}`}
                 onClick={() => setKind(value)}
               >
-                {value === 'VISIBILITY' ? 'Visibilité' : 'Promotion'}
+                {KIND_COPY[value].button}
               </button>
             ))}
           </div>
@@ -416,9 +447,28 @@ function RuleModal({
   );
 }
 
+/**
+ * La règle en une phrase, avec son effet hors créneau :
+ * « Visible seulement le dimanche, de 10:00 à 14:00 · masqué le reste du temps ».
+ */
+function describeRule(rule: Rule, promoTarget: string | null): string {
+  const copy = KIND_COPY[rule.kind];
+  const slot =
+    `${copy.during} ${describeDays(rule.daysOfWeek)}, de ${rule.startTime} à ${rule.endTime}` +
+    (rule.endTime <= rule.startTime ? ' (le lendemain)' : '');
+  return [
+    promoTarget,
+    slot,
+    copy.outside,
+    rule.discountPercent ? `−${rule.discountPercent} %` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
+
 function describeDays(days: number[]): string {
-  if (days.length === 7) return 'Tous les jours';
+  if (days.length === 7) return 'tous les jours';
   const sorted = [...days].sort((a, b) => (a === 0 ? 7 : a) - (b === 0 ? 7 : b));
-  if (sorted.length === 1) return `Le ${dayName(sorted[0]!).toLowerCase()}`;
-  return sorted.map((day) => dayName(day).slice(0, 3)).join(', ');
+  if (sorted.length === 1) return `le ${dayName(sorted[0]!).toLowerCase()}`;
+  return `les ${sorted.map((day) => dayName(day).slice(0, 3).toLowerCase()).join(', ')}`;
 }

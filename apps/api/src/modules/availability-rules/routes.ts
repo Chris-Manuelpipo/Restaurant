@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { FastifyPluginAsync } from 'fastify';
-import { createRuleSchema, updateRuleSchema } from '@evolyx/shared';
+import { RULE_KINDS, createRuleSchema, updateRuleSchema, type RuleKind } from '@evolyx/shared';
 import { CAPABILITIES } from '../../domain/permissions.js';
 import { scoped } from '../../lib/scope.js';
 import { requireAuth } from '../../plugins/auth.js';
@@ -11,8 +11,9 @@ import { jsonOrNull, owned } from '../../lib/prisma-helpers.js';
 /**
  * Règles de disponibilité.
  *
- * Deux usages, un seul modèle : masquer hors créneau (`VISIBILITY` — le brunch du dimanche)
- * ou signaler une promotion (`PROMO` — l'happy hour). `discountPercent` est informatif au
+ * Trois usages, un seul modèle : n'afficher que pendant le créneau (`VISIBILITY` — le brunch
+ * du dimanche), masquer pendant le créneau (`HIDE` — pas de grillades le dimanche midi) ou
+ * signaler une promotion (`PROMO` — l'happy hour). `discountPercent` est informatif au
  * lot 1 : il est stocké, affiché, mais aucun calcul ne s'appuie dessus tant que la Caisse
  * n'existe pas.
  */
@@ -28,13 +29,13 @@ const ruleRoutes: FastifyPluginAsync = async (app) => {
         summary: 'Règles de disponibilité et promotions',
         security: [{ bearerAuth: [] }],
         querystring: z.object({
-          kind: z.enum(['VISIBILITY', 'PROMO']).optional(),
+          kind: z.enum(RULE_KINDS).optional(),
           targetId: z.string().optional(),
         }),
       },
     },
     scoped(async (request, _reply, db) => {
-      const { kind, targetId } = request.query as { kind?: 'VISIBILITY' | 'PROMO'; targetId?: string };
+      const { kind, targetId } = request.query as { kind?: RuleKind; targetId?: string };
       return db.availabilityRule.findMany({
         where: { ...(kind ? { kind } : {}), ...(targetId ? { targetId } : {}) },
         orderBy: { createdAt: 'asc' },

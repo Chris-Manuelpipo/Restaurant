@@ -198,6 +198,63 @@ describe('isItemVisible', () => {
   });
 });
 
+describe('isItemVisible — règles HIDE', () => {
+  const masquerPlat = (over: Partial<RuleRow> = {}): RuleRow =>
+    rule({ id: 'hide', kind: 'HIDE', targetType: 'ITEM', targetId: 'item-1', ...over });
+
+  it('23 — masqué pendant son créneau', () => {
+    expect(isItemVisible(item(), category(), context(DIMANCHE_11H, [masquerPlat()]))).toBe(false);
+  });
+
+  it('24 — visible hors de son créneau, le même jour comme un autre jour', () => {
+    expect(isItemVisible(item(), category(), context(DIMANCHE_15H, [masquerPlat()]))).toBe(true);
+    expect(isItemVisible(item(), category(), context(JEUDI_18H, [masquerPlat()]))).toBe(true);
+  });
+
+  it('25 — un masquage de catégorie masque chacun de ses plats', () => {
+    const masquerCategorie = rule({ kind: 'HIDE', targetType: 'CATEGORY', targetId: 'cat-1' });
+    expect(isItemVisible(item(), category(), context(DIMANCHE_11H, [masquerCategorie]))).toBe(false);
+    expect(isItemVisible(item(), category(), context(JEUDI_18H, [masquerCategorie]))).toBe(true);
+  });
+
+  it('26 — un masquage de catégorie l’emporte même sur la visibilité propre du plat', () => {
+    const rules = [
+      rule({ id: 'hide-cat', kind: 'HIDE', targetType: 'CATEGORY', targetId: 'cat-1' }),
+      rule({ id: 'vis-item', targetType: 'ITEM', targetId: 'item-1' }),
+    ];
+    expect(isItemVisible(item(), category(), context(DIMANCHE_11H, rules))).toBe(false);
+  });
+
+  it('27 — masquage et visibilité sur le même plat : le masquage gagne là où ils se croisent', () => {
+    const rules = [
+      rule({ id: 'vis', targetType: 'ITEM', targetId: 'item-1', startTime: '10:00', endTime: '16:00' }),
+      masquerPlat({ startTime: '10:00', endTime: '12:00' }),
+    ];
+    expect(isItemVisible(item(), category(), context(DIMANCHE_11H, rules))).toBe(false);
+    expect(isItemVisible(item(), category(), context(DIMANCHE_15H, rules))).toBe(true);
+    expect(isItemVisible(item(), category(), context(JEUDI_18H, rules))).toBe(false);
+  });
+
+  it('28 — un masquage qui passe minuit tient jusqu’au petit matin', () => {
+    const nuit = masquerPlat({ daysOfWeek: [4], startTime: '22:00', endTime: '02:00' });
+    expect(isItemVisible(item(), category(), context(JEUDI_23H, [nuit]))).toBe(false);
+    expect(isItemVisible(item(), category(), context(VENDREDI_1H, [nuit]))).toBe(false);
+    expect(isItemVisible(item(), category(), context(VENDREDI_3H, [nuit]))).toBe(true);
+  });
+
+  it('29 — un masquage visant un autre plat n’a aucun effet', () => {
+    expect(
+      isItemVisible(item(), category(), context(DIMANCHE_11H, [masquerPlat({ targetId: 'item-99' })])),
+    ).toBe(true);
+  });
+
+  it('30 — un plat SOLD_OUT masqué reste masqué', () => {
+    expect(
+      isItemVisible(item({ status: 'SOLD_OUT' }), category(), context(DIMANCHE_11H, [masquerPlat()])),
+    ).toBe(false);
+  });
+});
+
 describe('isCategoryVisible', () => {
   it('suit ses propres règles horaires', () => {
     expect(isCategoryVisible(category(), context(DIMANCHE_11H, [rule()]))).toBe(true);
@@ -206,6 +263,12 @@ describe('isCategoryVisible', () => {
     expect(
       isCategoryVisible(category({ archivedAt: new Date() }), context(DIMANCHE_11H)),
     ).toBe(false);
+  });
+
+  it('disparaît pendant un masquage, revient après', () => {
+    const masquer = rule({ kind: 'HIDE' });
+    expect(isCategoryVisible(category(), context(DIMANCHE_11H, [masquer]))).toBe(false);
+    expect(isCategoryVisible(category(), context(DIMANCHE_15H, [masquer]))).toBe(true);
   });
 });
 
@@ -220,6 +283,7 @@ describe('rulesFor', () => {
   it('ne mélange pas les genres de règles', () => {
     const rules = [
       rule({ id: 'v', kind: 'VISIBILITY' }),
+      rule({ id: 'h', kind: 'HIDE' }),
       rule({ id: 'p', kind: 'PROMO' }),
     ];
     expect(rulesFor(item(), rules, 'VISIBILITY').map((r) => r.id)).toEqual(['v']);

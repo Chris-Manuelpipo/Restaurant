@@ -868,6 +868,41 @@ describe('menu public', () => {
     expect(response.json().generatedAt).toBe('2026-09-06T10:00:00.000Z');
   });
 
+  it('retire un plat pendant un créneau « masquer », le rend ensuite', async () => {
+    const created = await app.inject({
+      method: 'POST',
+      url: `${API}/availability-rules`,
+      headers: bearer(managerA),
+      payload: {
+        kind: 'HIDE',
+        targetType: 'ITEM',
+        targetId: world.a.itemId,
+        daysOfWeek: [0],
+        startTime: '10:00',
+        endTime: '14:00',
+      },
+    });
+    expect(created.statusCode).toBe(201);
+
+    const itemIds = async (at: string): Promise<string[]> => {
+      const menu = await app.inject({ method: 'GET', url: `${API}/public/r/${world.a.slug}/menu?at=${at}` });
+      return (menu.json().categories as { items: { id: string }[] }[]).flatMap((c) =>
+        c.items.map((i) => i.id),
+      );
+    };
+
+    // Dimanche 11 h puis 15 h à Douala (UTC+1).
+    expect(await itemIds('2026-09-06T10:00:00.000Z')).not.toContain(world.a.itemId);
+    expect(await itemIds('2026-09-06T14:00:00.000Z')).toContain(world.a.itemId);
+
+    const removed = await app.inject({
+      method: 'DELETE',
+      url: `${API}/availability-rules/${created.json().id}`,
+      headers: bearer(managerA),
+    });
+    expect(removed.statusCode).toBeLessThan(300);
+  });
+
   it('refuse un paramètre « at » invalide', async () => {
     const response = await app.inject({
       method: 'GET',
