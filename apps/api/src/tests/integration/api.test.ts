@@ -579,6 +579,199 @@ describe('points d’accès', () => {
 });
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   Tables de la salle
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+describe('tables', () => {
+  type Table = {
+    id: string;
+    label: string;
+    seats: number;
+    zone: string | null;
+    status: string;
+    archivedAt: string | null;
+    accessPoint: { id: string; code: string } | null;
+  };
+  let tables: Table[] = [];
+
+  it('crée un lot de tables en terrasse, chacune avec son code QR', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: `${API}/tables`,
+      headers: bearer(managerA),
+      payload: { label: 'Terrasse', quantity: 3, seats: 2, zone: 'Terrasse', withQrCodes: true },
+    });
+
+    expect(response.statusCode).toBe(201);
+    tables = response.json() as Table[];
+    expect(tables.map((t) => t.label)).toEqual(['Terrasse 1', 'Terrasse 2', 'Terrasse 3']);
+    expect(tables.every((t) => t.seats === 2 && t.zone === 'Terrasse' && t.status === 'FREE')).toBe(true);
+    expect(new Set(tables.map((t) => t.accessPoint?.code)).size).toBe(3);
+
+    // Le carton mène bien au menu.
+    const qr = await app.inject({ method: 'GET', url: `${API}/public/q/${tables[0]!.accessPoint!.code}` });
+    expect(qr.statusCode).toBe(302);
+  });
+
+  it('refuse un nom déjà porté par une table en service, sans tenir compte de la casse', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: `${API}/tables`,
+      headers: bearer(adminA),
+      payload: { label: 'terrasse 2' },
+    });
+    expect(response.statusCode).toBe(409);
+  });
+
+  it('renomme une table et garde le carton d’accord, sans changer le code', async () => {
+    const code = tables[0]!.accessPoint!.code;
+    const response = await app.inject({
+      method: 'PATCH',
+      url: `${API}/tables/${tables[0]!.id}`,
+      headers: bearer(adminA),
+      payload: { label: 'Terrasse VIP', seats: 6, zone: '' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const updated = response.json() as Table;
+    expect(updated).toMatchObject({ label: 'Terrasse VIP', seats: 6, zone: null });
+    expect(updated.accessPoint?.code).toBe(code);
+
+    const point = await asSystem((db) => db.accessPoint.findUnique({ where: { code } }));
+    expect(point?.label).toBe('Terrasse VIP');
+  });
+
+  it('laisse un STAFF changer le statut, mais pas la configuration', async () => {
+    const status = await app.inject({
+      method: 'PATCH',
+      url: `${API}/tables/${tables[1]!.id}/status`,
+      headers: bearer(staffA),
+      payload: { status: 'OCCUPIED' },
+    });
+    expect(status.statusCode).toBe(200);
+    expect(status.json().status).toBe('OCCUPIED');
+
+    const rename = await app.inject({
+      method: 'PATCH',
+      url: `${API}/tables/${tables[1]!.id}`,
+      headers: bearer(staffA),
+      payload: { label: 'Ailleurs' },
+    });
+    expect(rename.statusCode).toBe(403);
+  });
+
+  it('déplace un carton d’une table à l’autre, jamais sur deux tables à la fois', async () => {
+    const code = tables[2]!.accessPoint!;
+
+    const taken = await app.inject({
+      method: 'PUT',
+      url: `${API}/tables/${tables[1]!.id}/qr`,
+      headers: bearer(adminA),
+      payload: { accessPointId: code.id },
+    });
+    expect(taken.statusCode).toBe(409);
+
+    const detach = await app.inject({
+      method: 'PUT',
+      url: `${API}/tables/${tables[2]!.id}/qr`,
+      headers: bearer(adminA),
+      payload: { accessPointId: null },
+    });
+    expect(detach.json().accessPoint).toBeNull();
+
+    // Le code détaché reste valable…
+    const qr = await app.inject({ method: 'GET', url: `${API}/public/q/${code.code}` });
+    expect(qr.statusCode).toBe(302);
+
+    // …et peut être posé ailleurs.
+    const moved = await app.inject({
+      method: 'PUT',
+      url: `${API}/tables/${tables[1]!.id}/qr`,
+      headers: bearer(adminA),
+      payload: { accessPointId: code.id },
+    });
+    expect(moved.statusCode).toBe(200);
+    expect(moved.json().accessPoint.code).toBe(code.code);
+
+    const fresh = await app.inject({
+      method: 'PUT',
+      url: `${API}/tables/${tables[2]!.id}/qr`,
+      headers: bearer(adminA),
+      payload: { generate: true },
+    });
+    expect(fresh.statusCode).toBe(200);
+    expect(fresh.json().accessPoint.code).not.toBe(code.code);
+  });
+
+  it('archive une table : elle quitte la liste, libère son nom et son carton', async () => {
+    const archived = await app.inject({
+      method: 'POST',
+      url: `${API}/tables/${tables[2]!.id}/archive`,
+      headers: bearer(adminA),
+    });
+    expect(archived.statusCode).toBe(200);
+    expect(archived.json()).toMatchObject({ accessPoint: null });
+    expect(archived.json().archivedAt).not.toBeNull();
+
+    const list = await app.inject({ method: 'GET', url: `${API}/tables`, headers: bearer(staffA) });
+    expect((list.json() as Table[]).some((t) => t.id === tables[2]!.id)).toBe(false);
+
+    const withArchived = await app.inject({
+      method: 'GET',
+      url: `${API}/tables?includeArchived=true`,
+      headers: bearer(adminA),
+    });
+    expect((withArchived.json() as Table[]).some((t) => t.id === tables[2]!.id)).toBe(true);
+
+    const reuse = await app.inject({
+      method: 'POST',
+      url: `${API}/tables`,
+      headers: bearer(adminA),
+      payload: { label: 'Terrasse 3' },
+    });
+    expect(reuse.statusCode).toBe(201);
+
+    // Le nom est repris : la restauration doit le refuser plutôt que créer un doublon.
+    const restore = await app.inject({
+      method: 'POST',
+      url: `${API}/tables/${tables[2]!.id}/restore`,
+      headers: bearer(adminA),
+    });
+    expect(restore.statusCode).toBe(409);
+  });
+
+  it('ne laisse ni voir ni toucher les tables d’un autre restaurant', async () => {
+    const list = await app.inject({ method: 'GET', url: `${API}/tables`, headers: bearer(adminB) });
+    expect(list.statusCode).toBe(200);
+    expect((list.json() as Table[]).some((t) => tables.some((own) => own.id === t.id))).toBe(false);
+
+    const patch = await app.inject({
+      method: 'PATCH',
+      url: `${API}/tables/${tables[1]!.id}/status`,
+      headers: bearer(adminB),
+      payload: { status: 'FREE' },
+    });
+    expect(patch.statusCode).toBe(404);
+  });
+
+  it('refuse de poser le carton d’un autre restaurant', async () => {
+    const own = await app.inject({
+      method: 'POST',
+      url: `${API}/tables`,
+      headers: bearer(adminB),
+      payload: { label: 'Table B' },
+    });
+    const response = await app.inject({
+      method: 'PUT',
+      url: `${API}/tables/${(own.json() as Table[])[0]!.id}/qr`,
+      headers: bearer(adminB),
+      payload: { accessPointId: tables[1]!.accessPoint!.id },
+    });
+    expect(response.statusCode).toBe(404);
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
    Menu public
    ═══════════════════════════════════════════════════════════════════════════ */
 

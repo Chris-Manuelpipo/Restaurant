@@ -50,6 +50,21 @@ export function AccessPointsPage(): JSX.Element {
     onError: () => toast.error('Révocation impossible.'),
   });
 
+  /** Suspendre est réversible, à l'inverse de la révocation : table hors service, terrasse fermée… */
+  const toggleActive = useMutation({
+    mutationFn: (point: AccessPointSummary) =>
+      api.patch(`/access-points/${point.id}`, { isActive: !point.isActive }),
+    onSuccess: async (_data, point) => {
+      toast.success(
+        point.isActive
+          ? 'Code suspendu. Réactivez-le quand vous voulez, sans réimprimer.'
+          : 'Code réactivé. Le carton mène de nouveau à votre menu.',
+      );
+      await queryClient.invalidateQueries({ queryKey: ['access-points'] });
+    },
+    onError: () => toast.error('Modification impossible.'),
+  });
+
   if (points.isLoading) {
     return (
       <div className="grid place-items-center py-24">
@@ -61,6 +76,7 @@ export function AccessPointsPage(): JSX.Element {
   const list = points.data ?? [];
   const writable = can('access_points:write');
   const active = list.filter((point) => point.revokedAt === null);
+  const suspended = active.filter((point) => !point.isActive).length;
 
   return (
     <>
@@ -106,7 +122,9 @@ export function AccessPointsPage(): JSX.Element {
           <>
             <div className="flex items-center justify-between mb-4">
               <p className="text-[13px]" style={{ color: 'var(--ink-2)' }}>
-                {active.length} code{active.length > 1 ? 's' : ''} actif{active.length > 1 ? 's' : ''}
+                {active.length - suspended} code{active.length - suspended > 1 ? 's' : ''} actif
+                {active.length - suspended > 1 ? 's' : ''}
+                {suspended > 0 ? ` · ${suspended} suspendu${suspended > 1 ? 's' : ''}` : ''}
               </p>
               <label className="flex items-center gap-2 text-[12.5px]" style={{ color: 'var(--ink-2)' }}>
                 <input
@@ -124,7 +142,7 @@ export function AccessPointsPage(): JSX.Element {
                 <article
                   key={point.id}
                   className="evx-card"
-                  style={{ opacity: point.revokedAt ? 0.55 : 1 }}
+                  style={{ opacity: point.revokedAt || !point.isActive ? 0.55 : 1 }}
                 >
                   <div className="evx-card__body text-center">
                     <div
@@ -144,13 +162,24 @@ export function AccessPointsPage(): JSX.Element {
 
                     <div className="mt-2 flex justify-center gap-2">
                       <Badge tone="neutral">{kindLabel(point.kind)}</Badge>
-                      {point.revokedAt ? <Badge tone="danger">Révoqué</Badge> : null}
+                      {point.revokedAt ? (
+                        <Badge tone="danger">Révoqué</Badge>
+                      ) : !point.isActive ? (
+                        <Badge tone="neutral">Suspendu</Badge>
+                      ) : null}
                     </div>
 
                     {writable && !point.revokedAt ? (
-                      <div className="mt-4 flex gap-2 justify-center">
+                      <div className="mt-4 flex flex-wrap gap-2 justify-center">
                         <Button size="sm" onClick={() => setEditing(point)}>
-                          Réaffecter
+                          Modifier
+                        </Button>
+                        <Button
+                          size="sm"
+                          loading={toggleActive.isPending && toggleActive.variables?.id === point.id}
+                          onClick={() => toggleActive.mutate(point)}
+                        >
+                          {point.isActive ? 'Suspendre' : 'Réactiver'}
                         </Button>
                         <Button
                           size="sm"
@@ -178,7 +207,7 @@ export function AccessPointsPage(): JSX.Element {
       </div>
 
       {editing ? (
-        <RenameModal
+        <EditModal
           point={editing}
           onClose={() => setEditing(null)}
           onSaved={async () => {
@@ -187,6 +216,7 @@ export function AccessPointsPage(): JSX.Element {
           }}
         />
       ) : null}
+
 
       {creating ? (
         <CreateModal
@@ -225,7 +255,7 @@ function QrThumb({ id }: { id: string }): JSX.Element {
   );
 }
 
-function RenameModal({
+function EditModal({
   point,
   onClose,
   onSaved,
@@ -236,9 +266,10 @@ function RenameModal({
 }): JSX.Element {
   const toast = useToast();
   const [label, setLabel] = useState(point.label);
+  const [kind, setKind] = useState<string>(point.kind);
 
   const save = useMutation({
-    mutationFn: () => api.patch(`/access-points/${point.id}`, { label }),
+    mutationFn: () => api.patch(`/access-points/${point.id}`, { label: label.trim(), kind }),
     onSuccess: async () => {
       toast.success('Point d’accès réaffecté. Aucun code à réimprimer.');
       await onSaved();
@@ -251,12 +282,17 @@ function RenameModal({
     <Modal
       open
       onClose={onClose}
-      title="Réaffecter ce code"
+      title="Modifier ce code"
       description="Le code reste identique : le carton déjà collé continue de fonctionner."
       footer={
         <>
           <Button onClick={onClose}>Annuler</Button>
-          <Button variant="primary" loading={save.isPending} onClick={() => save.mutate()}>
+          <Button
+            variant="primary"
+            loading={save.isPending}
+            disabled={label.trim() === ''}
+            onClick={() => save.mutate()}
+          >
             Enregistrer
           </Button>
         </>
@@ -275,6 +311,14 @@ function RenameModal({
             onChange={(event) => setLabel(event.target.value)}
             placeholder="Table 7"
           />
+        )}
+      </Field>
+
+      <Field label="Type">
+        {(id) => (
+          <Select id={id} value={kind} onChange={(event) => setKind(event.target.value)}>
+            <KindOptions />
+          </Select>
         )}
       </Field>
     </Modal>
@@ -322,11 +366,7 @@ function CreateModal({
       <Field label="Type">
         {(id) => (
           <Select id={id} value={kind} onChange={(event) => setKind(event.target.value)}>
-            <option value="TABLE">Table</option>
-            <option value="COUNTER">Comptoir</option>
-            <option value="WINDOW">Vitrine</option>
-            <option value="POSTER">Affiche</option>
-            <option value="OTHER">Autre</option>
+            <KindOptions />
           </Select>
         )}
       </Field>
@@ -366,5 +406,17 @@ function CreateModal({
         Sera créé : {quantity > 1 ? `${label} ${startAt} … ${label} ${startAt + quantity - 1}` : label}
       </p>
     </Modal>
+  );
+}
+
+function KindOptions(): JSX.Element {
+  return (
+    <>
+      <option value="TABLE">Table</option>
+      <option value="COUNTER">Comptoir</option>
+      <option value="WINDOW">Vitrine</option>
+      <option value="POSTER">Affiche</option>
+      <option value="OTHER">Autre</option>
+    </>
   );
 }

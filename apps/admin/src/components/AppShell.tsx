@@ -48,6 +48,18 @@ const NAV: NavEntry[] = [
     ),
   },
   {
+    to: '/tables',
+    label: 'Tables',
+    section: 'quotidien',
+    capability: 'tables:read',
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <rect x="4" y="8" width="16" height="5" rx="1.5" />
+        <path d="M7 13v7M17 13v7M8 4h8" />
+      </svg>
+    ),
+  },
+  {
     to: '/codes-qr',
     label: 'Codes QR',
     section: 'quotidien',

@@ -18,6 +18,7 @@ const TENANT_MODELS = new Set([
   'MenuItem',
   'AvailabilityRule',
   'AccessPoint',
+  'DiningTable',
   'AuditLog',
   'Invitation',
 ]);

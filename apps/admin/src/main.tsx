@@ -25,6 +25,7 @@ import { OnboardingPage } from './routes/OnboardingPage';
 import { MenuPage } from './routes/MenuPage';
 import { RulesPage } from './routes/RulesPage';
 import { AccessPointsPage } from './routes/AccessPointsPage';
+import { TablesPage } from './routes/TablesPage';
 import { BrandingPage } from './routes/BrandingPage';
 import { TeamPage } from './routes/TeamPage';
 import { AuditPage } from './routes/AuditPage';
@@ -88,6 +89,7 @@ const routeTree = rootRoute.addChildren([
     route('/mise-en-service', OnboardingPage),
     route('/carte', MenuPage),
     route('/regles', RulesPage),
+    route('/tables', TablesPage),
     route('/codes-qr', AccessPointsPage),
     route('/charte', BrandingPage),
     route('/equipe', TeamPage),

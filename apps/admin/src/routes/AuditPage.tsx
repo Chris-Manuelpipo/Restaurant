@@ -29,6 +29,12 @@ const ACTION_LABELS: Record<string, string> = {
   'access_point.created': 'Codes QR générés',
   'access_point.updated': 'Point d’accès réaffecté',
   'access_point.revoked': 'Code QR révoqué',
+  'table.created': 'Tables ajoutées',
+  'table.updated': 'Table modifiée',
+  'table.status_changed': 'Statut de table',
+  'table.qr_changed': 'Code QR de table',
+  'table.archived': 'Table archivée',
+  'table.restored': 'Table restaurée',
   'user.created': 'Compte créé',
   'user.updated': 'Compte modifié',
   'user.deactivated': 'Compte désactivé',
@@ -41,6 +47,13 @@ const STATUS_LABELS: Record<string, string> = {
   AVAILABLE: 'disponible',
   SOLD_OUT: 'épuisé',
   DISABLED: 'retiré',
+};
+
+const TABLE_STATUS_LABELS: Record<string, string> = {
+  FREE: 'libre',
+  OCCUPIED: 'occupée',
+  RESERVED: 'réservée',
+  OUT_OF_SERVICE: 'hors service',
 };
 
 export function AuditPage(): JSX.Element {
@@ -128,6 +141,24 @@ function describe(entry: AuditEntry): string {
 
   if (entry.action === 'access_point.created') {
     return `${after.count ?? '?'} × ${after.label ?? 'point d’accès'}`;
+  }
+
+  if (entry.action === 'table.created') {
+    return `${after.count ?? '?'} × ${after.label ?? 'table'}${after.zone ? ` (${String(after.zone)})` : ''}`;
+  }
+
+  if (entry.action === 'table.status_changed') {
+    return `${TABLE_STATUS_LABELS[String(before.status)] ?? before.status} → ${
+      TABLE_STATUS_LABELS[String(after.status)] ?? after.status
+    }`;
+  }
+
+  if (entry.action === 'table.qr_changed') {
+    return `${before.code ? String(before.code) : 'aucun'} → ${after.code ? String(after.code) : 'aucun'}`;
+  }
+
+  if (entry.action === 'table.archived') {
+    return `« ${String(before.label ?? '')} » archivée.`;
   }
 
   const changed = (entry.diff as { changed?: string[] })?.changed ?? [];

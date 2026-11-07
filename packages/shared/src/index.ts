@@ -14,3 +14,4 @@ export * from './schemas/restaurant.js';
 export * from './schemas/menu.js';
 export * from './schemas/rules.js';
 export * from './schemas/access-points.js';
+export * from './schemas/tables.js';

@@ -27,6 +27,7 @@ import categoryRoutes from './modules/categories/routes.js';
 import menuItemRoutes from './modules/menu-items/routes.js';
 import ruleRoutes from './modules/availability-rules/routes.js';
 import accessPointRoutes from './modules/access-points/routes.js';
+import tableRoutes from './modules/tables/routes.js';
 import userRoutes from './modules/users/routes.js';
 import platformRoutes from './modules/platform/routes.js';
 import publicRoutes from './modules/public/routes.js';
@@ -187,6 +188,7 @@ export async function buildApp(options: BuildOptions = {}): Promise<FastifyInsta
         { name: 'restaurant', description: 'Identité, charte, horaires' },
         { name: 'menu', description: 'Catégories, plats, règles' },
         { name: 'access-points', description: 'Codes QR' },
+        { name: 'tables', description: 'Tables de la salle' },
         { name: 'users', description: 'Comptes du restaurant' },
         { name: 'platform', description: 'Administration de la plateforme' },
       ],
@@ -217,6 +219,7 @@ export async function buildApp(options: BuildOptions = {}): Promise<FastifyInsta
       await api.register(menuItemRoutes, { prefix: '/menu-items' });
       await api.register(ruleRoutes, { prefix: '/availability-rules' });
       await api.register(accessPointRoutes, { prefix: '/access-points' });
+      await api.register(tableRoutes, { prefix: '/tables' });
       await api.register(userRoutes, { prefix: '/users' });
       await api.register(platformRoutes, { prefix: '/platform' });
     },

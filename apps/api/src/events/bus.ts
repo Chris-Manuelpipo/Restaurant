@@ -10,7 +10,7 @@
  * revient à fournir une autre implémentation de `EventBus` — les publieurs n'en sauront rien.
  */
 
-import type { ItemStatus } from '@evolyx/shared';
+import type { ItemStatus, TableStatus } from '@evolyx/shared';
 
 export interface DomainEvents {
   'menu_item.updated': {
@@ -38,6 +38,13 @@ export interface DomainEvents {
   'availability_rule.changed': { restaurantId: string; ruleId: string; userId?: string };
   'access_point.created': { restaurantId: string; accessPointIds: string[]; userId?: string };
   'access_point.revoked': { restaurantId: string; accessPointId: string; code: string; userId?: string };
+  'table.status_changed': {
+    restaurantId: string;
+    tableId: string;
+    from: TableStatus;
+    to: TableStatus;
+    userId?: string;
+  };
   'user.created': { restaurantId: string; userId: string; role: string; actorId?: string };
   'user.deactivated': { restaurantId: string; userId: string; actorId?: string };
 }

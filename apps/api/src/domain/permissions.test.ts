@@ -23,6 +23,9 @@ const ATTENDU: Record<Capability, Role[]> = {
   [CAPABILITIES.RULES_WRITE]: ['PLATFORM_ADMIN', 'ADMIN', 'MANAGER'],
   [CAPABILITIES.ACCESS_POINTS_READ]: ['PLATFORM_ADMIN', 'ADMIN', 'MANAGER', 'STAFF'],
   [CAPABILITIES.ACCESS_POINTS_WRITE]: ['PLATFORM_ADMIN', 'ADMIN', 'MANAGER'],
+  [CAPABILITIES.TABLES_READ]: ['PLATFORM_ADMIN', 'ADMIN', 'MANAGER', 'STAFF'],
+  [CAPABILITIES.TABLES_WRITE]: ['PLATFORM_ADMIN', 'ADMIN', 'MANAGER'],
+  [CAPABILITIES.TABLES_STATUS]: ['PLATFORM_ADMIN', 'ADMIN', 'MANAGER', 'STAFF'],
   [CAPABILITIES.AUDIT_READ]: ['PLATFORM_ADMIN', 'ADMIN'],
 };
 
@@ -79,13 +82,15 @@ describe('capabilitiesFor', () => {
     expect(sans).toContain(CAPABILITIES.MENU_WRITE);
   });
 
-  it('un STAFF sans module n’a que ses droits de lecture et le statut des plats', () => {
+  it('un STAFF sans module n’a que ses droits de lecture et le statut des plats et des tables', () => {
     expect(capabilitiesFor('STAFF', []).sort()).toEqual(
       [
         CAPABILITIES.RESTAURANT_READ,
         CAPABILITIES.MENU_READ,
         CAPABILITIES.MENU_STATUS,
         CAPABILITIES.RULES_READ,
+        CAPABILITIES.TABLES_READ,
+        CAPABILITIES.TABLES_STATUS,
       ].sort(),
     );
   });

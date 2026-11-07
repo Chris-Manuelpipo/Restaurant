@@ -6,6 +6,7 @@ import type {
   ModuleKey,
   RestaurantStatus,
   Role,
+  TableStatus,
 } from './constants.js';
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -169,6 +170,20 @@ export interface AccessPointSummary {
   revokedAt: string | null;
   /** URL complète à imprimer, telle qu'elle est encodée dans le QR. */
   url: string;
+}
+
+export interface DiningTableSummary {
+  id: string;
+  label: string;
+  seats: number;
+  zone: string | null;
+  status: TableStatus;
+  statusChangedAt: string;
+  sortOrder: number;
+  archivedAt: string | null;
+  createdAt: string;
+  /** Le carton posé sur la table, s'il y en a un. */
+  accessPoint: Pick<AccessPointSummary, 'id' | 'code' | 'isActive' | 'url'> | null;
 }
 
 export interface MenuImportRow {

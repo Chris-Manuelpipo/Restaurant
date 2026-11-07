@@ -34,6 +34,9 @@ export type ItemStatus = (typeof ITEM_STATUSES)[number];
 export const ACCESS_POINT_KINDS = ['TABLE', 'COUNTER', 'WINDOW', 'POSTER', 'OTHER'] as const;
 export type AccessPointKind = (typeof ACCESS_POINT_KINDS)[number];
 
+export const TABLE_STATUSES = ['FREE', 'OCCUPIED', 'RESERVED', 'OUT_OF_SERVICE'] as const;
+export type TableStatus = (typeof TABLE_STATUSES)[number];
+
 export const RULE_TARGETS = ['CATEGORY', 'ITEM'] as const;
 export const RULE_KINDS = ['VISIBILITY', 'PROMO'] as const;
 

@@ -56,6 +56,13 @@ enum AccessPointKind {
 }
 
 model Restaurant {
+enum TableStatus {
+  FREE
+  OCCUPIED
+  RESERVED
+  OUT_OF_SERVICE
+}
+
   id       String           @id @default(cuid(2))
   slug     String           @unique
   name     String
@@ -98,6 +105,7 @@ model Restaurant {
   availabilityRules AvailabilityRule[]
   accessPoints      AccessPoint[]
   auditLogs         AuditLog[]
+  diningTables      DiningTable[]
   invitations       Invitation[]
 
   @@index([status])
@@ -322,10 +330,43 @@ model AccessPoint {
   revokedAt DateTime?
 
   @@index([restaurantId, isActive])
+  /// La table physique à laquelle ce code est posé, s'il y en a une.
+  table DiningTable?
+
   @@index([restaurantId, kind])
 }
 
 model AuditLog {
+/// Une table de la salle — l'objet que gère le personnel, distinct du carton QR posé dessus.
+/// Nommée `DiningTable` : `Table` est un mot réservé en SQL.
+model DiningTable {
+  id           String     @id @default(cuid(2))
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  /// « Table 12 », « T4 », « Banquette »… Unique parmi les tables non archivées du restaurant.
+  label String
+  seats Int    @default(4)
+  /// Salle, terrasse, étage… Texte libre : chaque restaurant découpe sa salle à sa façon.
+  zone  String?
+
+  status          TableStatus @default(FREE)
+  statusChangedAt DateTime    @default(now())
+
+  /// Le carton QR posé sur la table. Un code ne sert qu'une table à la fois.
+  accessPointId String?      @unique
+  accessPoint   AccessPoint? @relation(fields: [accessPointId], references: [id], onDelete: SetNull)
+
+  sortOrder  Int       @default(0)
+  /// Archivée plutôt que supprimée : l'historique (et demain les commandes) y renvoient.
+  archivedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([restaurantId, archivedAt])
+  @@index([restaurantId, zone])
+}
+
   id String @id @default(cuid(2))
 
   restaurantId String?

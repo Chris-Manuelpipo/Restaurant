@@ -34,6 +34,12 @@ export const CAPABILITIES = {
   ACCESS_POINTS_READ: 'access_points:read',
   ACCESS_POINTS_WRITE: 'access_points:write',
 
+  /* Tables de la salle */
+  TABLES_READ: 'tables:read',
+  TABLES_WRITE: 'tables:write',
+  /** Libre, occupée, réservée : le geste du service. Ouvert à toute la salle. */
+  TABLES_STATUS: 'tables:status',
+
   /* Journal */
   AUDIT_READ: 'audit:read',
 } as const;
@@ -51,6 +57,8 @@ export type Capability = (typeof CAPABILITIES)[keyof typeof CAPABILITIES];
  * | Menu, catégories, règles |       ✔        |   ✔   |    ✔    | lecture |
  * | Statut d'un plat         |       ✔        |   ✔   |    ✔    |    ✔    |
  * | Codes QR                 |       ✔        |   ✔   |    ✔    | lecture |
+ * | Tables (plan de salle)   |       ✔        |   ✔   |    ✔    | lecture |
+ * | Statut d'une table       |       ✔        |   ✔   |    ✔    |    ✔    |
  */
 const MATRIX: Record<Capability, Role[]> = {
   [CAPABILITIES.PLATFORM_MANAGE]: ['PLATFORM_ADMIN'],
@@ -70,6 +78,10 @@ const MATRIX: Record<Capability, Role[]> = {
 
   [CAPABILITIES.ACCESS_POINTS_READ]: ['PLATFORM_ADMIN', 'ADMIN', 'MANAGER', 'STAFF'],
   [CAPABILITIES.ACCESS_POINTS_WRITE]: ['PLATFORM_ADMIN', 'ADMIN', 'MANAGER'],
+
+  [CAPABILITIES.TABLES_READ]: ['PLATFORM_ADMIN', 'ADMIN', 'MANAGER', 'STAFF'],
+  [CAPABILITIES.TABLES_WRITE]: ['PLATFORM_ADMIN', 'ADMIN', 'MANAGER'],
+  [CAPABILITIES.TABLES_STATUS]: ['PLATFORM_ADMIN', 'ADMIN', 'MANAGER', 'STAFF'],
 
   [CAPABILITIES.AUDIT_READ]: ['PLATFORM_ADMIN', 'ADMIN'],
 };

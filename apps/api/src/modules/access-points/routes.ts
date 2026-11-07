@@ -4,10 +4,9 @@ import {
   accessPointPdfQuerySchema,
   createAccessPointsSchema,
   updateAccessPointSchema,
-  type AccessPointKind,
 } from '@evolyx/shared';
 import { CAPABILITIES } from '../../domain/permissions.js';
-import { generateAccessCode } from '../../domain/access-code.js';
+import { createAccessPointWithUniqueCode } from './create.js';
 import { scoped } from '../../lib/scope.js';
 import { requireAuth } from '../../plugins/auth.js';
 import { recordAudit } from '../../services/audit.js';
@@ -16,7 +15,7 @@ import { generateQrPng, generateQrSvg } from '../../services/qr.js';
 import { getStorage } from '../../services/storage.js';
 import { accessPointUrl, menuUrlFor } from '../../config/env.js';
 import { AppError, notFound } from '../../lib/errors.js';
-import { asTheme, owned } from '../../lib/prisma-helpers.js';
+import { asTheme } from '../../lib/prisma-helpers.js';
 
 /**
  * Points d'accès — les codes QR posés sur les tables.
@@ -28,27 +27,6 @@ import { asTheme, owned } from '../../lib/prisma-helpers.js';
 const accessPointRoutes: FastifyPluginAsync = async (app) => {
   const idParam = z.object({ id: z.string().min(8).max(40) });
 
-  /** Trois tentatives suffisent : l'espace de codes est immense, la contrainte fait foi. */
-  async function createWithUniqueCode(
-    db: Parameters<Parameters<typeof scoped>[0]>[2],
-    data: { kind: string; label: string },
-  ) {
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-      try {
-        return await db.accessPoint.create({
-          data: owned({
-            code: generateAccessCode(),
-            kind: data.kind as AccessPointKind,
-            label: data.label,
-          }),
-        });
-      } catch (error) {
-        const code = (error as { code?: string }).code;
-        if (code !== 'P2002') throw error;
-      }
-    }
-    throw new AppError('INTERNAL_ERROR', 'Impossible de générer un code unique. Réessayez.');
-  }
 
   app.get(
     '/',
@@ -58,7 +36,13 @@ const accessPointRoutes: FastifyPluginAsync = async (app) => {
         tags: ['access-points'],
         summary: 'Points d’accès du restaurant',
         security: [{ bearerAuth: [] }],
-        querystring: z.object({ includeRevoked: z.coerce.boolean().default(false) }),
+        // Pas de `z.coerce.boolean()` : `Boolean('false')` vaut `true`, la case ne filtrerait rien.
+        querystring: z.object({
+          includeRevoked: z
+            .enum(['true', 'false'])
+            .default('false')
+            .transform((value) => value === 'true'),
+        }),
       },
     },
     scoped(async (request, _reply, db) => {
@@ -98,7 +82,7 @@ const accessPointRoutes: FastifyPluginAsync = async (app) => {
       const created = [];
       for (let index = 0; index < quantity; index += 1) {
         const finalLabel = quantity === 1 ? label : `${label} ${startAt + index}`;
-        created.push(await createWithUniqueCode(db, { kind, label: finalLabel }));
+        created.push(await createAccessPointWithUniqueCode(db, { kind, label: finalLabel }));
       }
 
       await recordAudit({
